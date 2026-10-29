@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Project Mio</title>
+<style>
+  [hidden]{display:none!important}
+  img{max-width:100%}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    /* 페이지(개발자 패널) — 밝은 종이 */
+    --ground:#efe8dc;
+    --surface:#f8f1e2; --surface2:#efe4cc;
+    --line:#dccaa6; --line2:#c3a97d;
+    --ink:#2b2118; --muted:#76654f;
+    --accent:#b8862b;
+    --mine:#2f5b9a; --foe:#a8382c; --speed:#6a4c9c;
+    /* 게임 화면 — 어두운 방 */
+    --room:#0b0806;
+    --ivory:#f1e5c9; --ivory-dim:rgba(241,229,201,.62); --hairline:rgba(241,229,201,.22);
+    --brass:#d8a93f; --brass-hi:#ffe3a0; --brass-dark:#5a3e0e;
+    --team-m:#3b6fc0; --team-m-glow:rgba(110,160,255,.75);
+    --team-f:#c0392b; --team-f-glow:rgba(255,95,70,.75);
+    --violet:#b49cff;
+    --hp:#9fd38a; --hurt:#ff8a6b;
+    --grain:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.003 0.11' numOctaves='3' seed='11'/><feColorMatrix values='0 0 0 0 0.42 0 0 0 0 0.27 0 0 0 0 0.12 0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    --grain-dark:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='520' height='520'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.004 0.12' numOctaves='3' seed='4'/><feColorMatrix values='0 0 0 0 0.16 0 0 0 0 0.09 0 0 0 0 0.03 0 0 0 0.65 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    --grain-tile:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.01 0.18' numOctaves='2' seed='9'/><feColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.2 0 0 0 0 0.08 0 0 0 0.45 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    color-scheme:light;
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:"IBM Plex Sans KR",system-ui,"Malgun Gothic",sans-serif;font-size:15px;line-height:1.5;min-height:100%}
+  .serif{font-family:"Gowun Batang","Batang",serif}
+
+  /* ============ 16:9 뷰포트 ============ */
+  .viewport{background:var(--room);padding:16px;display:flex;justify-content:center}
+  .holder{position:relative;overflow:hidden;border-radius:6px;box-shadow:0 0 0 1px #2a1f16}
+  .stage{position:absolute;top:0;left:0;width:1280px;height:720px;transform-origin:0 0;overflow:hidden;
+    background:var(--room);color:var(--ivory);user-select:none;-webkit-user-select:none}
+
+  /* 방 · 테이블 · 램프 */
+  .table{position:absolute;inset:-40px;
+    background:
+      repeating-linear-gradient(180deg, transparent 0 178px, rgba(40,22,8,.35) 178px 180px, rgba(255,220,170,.10) 180px 181px, transparent 181px 240px),
+      var(--grain),
+      linear-gradient(180deg,#9c7146,#7d5733);
+    -webkit-mask-image:radial-gradient(ellipse 62% 66% at 50% 50%, #000 30%, rgba(0,0,0,.55) 58%, transparent 82%);
+            mask-image:radial-gradient(ellipse 62% 66% at 50% 50%, #000 30%, rgba(0,0,0,.55) 58%, transparent 82%)}
+  .lamp{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse 46% 52% at 50% 46%, rgba(255,205,130,.30), rgba(255,180,100,.08) 55%, transparent 75%)}
+  .vignette{position:absolute;inset:0;pointer-events:none;z-index:3;
+    background:radial-gradient(ellipse 75% 80% at 50% 48%, transparent 52%, rgba(5,3,2,.72) 100%)}
+
+  /* ============ 3D 보드 ============ */
+  .scene{position:absolute;left:0;right:0;top:58px;height:540px;perspective:1150px;perspective-origin:50% 30%;z-index:1}
+  .board3d{position:absolute;left:50%;top:50%;width:522px;height:522px;margin:-261px 0 0 -261px;
+    transform-style:preserve-3d;transform:rotateX(50deg) translateY(-6px);
+    border-radius:12px;
+    background:var(--grain-dark),linear-gradient(160deg,#5e3d22,#3d2614);
+    box-shadow:inset 0 0 0 2px #24160b,inset 0 2px 0 rgba(255,220,170,.22)}
+  .frameface{position:absolute;left:0;right:0;top:100%;height:26px;transform-origin:top;transform:rotateX(-90deg);
+    background:linear-gradient(180deg,#3a2414,#20130a);border-radius:0 0 8px 8px}
+  .boardshadow{position:absolute;inset:-40px -60px -70px;transform:translateZ(-30px);pointer-events:none;
+    background:radial-gradient(closest-side, rgba(0,0,0,.7), transparent)}
+
+  .slot{position:absolute;width:112px;height:112px;transform:translateZ(10px);transform-style:preserve-3d;border-radius:4px;
+    background:var(--grain-tile),linear-gradient(160deg,#cfa06a,#a9784a);
+    box-shadow:inset 0 0 0 1px rgba(50,28,10,.6),inset 0 2px 0 rgba(255,235,200,.35)}
+  .slot::before{content:"";position:absolute;left:0;right:0;top:100%;height:10px;transform-origin:top;transform:rotateX(-90deg);
+    background:linear-gradient(180deg,#7a4f2c,#4a2e17)}
+  .slot.zone-f{background:linear-gradient(rgba(170,45,35,.42),rgba(170,45,35,.42)),var(--grain-tile),linear-gradient(160deg,#cfa06a,#a9784a)}
+  .slot.zone-m{background:linear-gradient(rgba(45,95,175,.42),rgba(45,95,175,.42)),var(--grain-tile),linear-gradient(160deg,#cfa06a,#a9784a)}
+  .slot .glyph{position:absolute;inset:26px;opacity:.5}
+  .slot.zone-f .glyph{color:#ffb2a6} .slot.zone-m .glyph{color:#b9d3ff}
+  .slot .glyph svg{width:100%;height:100%}
+  .slot.open{cursor:pointer;box-shadow:inset 0 0 0 3px #b9d3ff,0 0 20px 2px var(--team-m-glow)}
+  .slot.open .glyph{opacity:.9}
+  .slot.target{box-shadow:inset 0 0 0 4px var(--brass-hi),0 0 28px 6px rgba(255,200,90,.85)}
+  .slot.target .glyph{color:var(--brass-hi);opacity:1}
+  .slot:focus-visible{outline:3px solid var(--brass-hi);outline-offset:2px}
+
+  /* 받침대 위 미니어처 */
+  .piece{position:absolute;inset:0;transform-style:preserve-3d;pointer-events:none}
+  .piece.m{--team:var(--team-m);--glow:var(--team-m-glow)}
+  .piece.f{--team:var(--team-f);--glow:var(--team-f-glow)}
+  .base{position:absolute;left:12px;top:14px;width:88px;height:88px;border-radius:50%;transform:translateZ(2px);
+    background:radial-gradient(circle at 40% 35%,#5a3d26,#24160b 72%);border:6px solid var(--team);
+    box-shadow:0 0 0 2px #140c06,0 8px 10px rgba(0,0,0,.55)}
+  .mini{position:absolute;left:8px;top:-4px;width:96px;height:100px;transform-origin:50% 100%;
+    transform:translateZ(3px) rotateX(-50deg);
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-end;pointer-events:auto}
+  .mini .art{height:76px;width:100%;display:flex;justify-content:center;color:var(--team);
+    filter:drop-shadow(0 3px 2px rgba(0,0,0,.5))}
+  .mini .art svg{height:100%;width:auto;overflow:visible}
+  .piece.f .mini .art svg{transform:scaleX(-1)}
+  .plaque{display:flex;gap:5px;margin-top:-1px;padding:1px 6px;border-radius:4px;
+    background:rgba(20,13,8,.9);border:1px solid rgba(255,235,200,.28);
+    font-family:"Gowun Batang","Batang",serif;font-weight:700;font-size:13px;line-height:1.3;color:var(--ivory);
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+  .plaque span{display:flex;align-items:center;gap:2px}
+  .plaque svg{width:10px;height:10px}
+  .plaque .h{color:var(--hp)} .plaque .h.hurt{color:var(--hurt)}
+  .plaque .s{color:var(--violet)}
+  .ord{position:absolute;top:2px;left:4px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;
+    background:#140c06;color:var(--ivory);border:1.5px solid rgba(241,229,201,.45);
+    font-family:"IBM Plex Mono",monospace;font-weight:700;font-size:11px;
+    display:flex;align-items:center;justify-content:center}
+  .ord[hidden]{display:none}
+  .ord.plan{opacity:.75}
+  .ord.duel{border-color:var(--violet);box-shadow:0 0 0 2px rgba(180,156,255,.45)}
+  .ord.acting{background:var(--brass);color:#1a120c;border-color:var(--brass-hi);opacity:1}
+  .ord.done{opacity:.3}
+  .piece.acting .base{border-color:var(--brass-hi);box-shadow:0 0 0 2px #140c06,0 0 26px 8px rgba(255,200,90,.85)}
+  .piece.acting .mini .art{filter:drop-shadow(0 0 6px rgba(255,210,120,.9)) drop-shadow(0 3px 2px rgba(0,0,0,.5))}
+  .piece.duel .base{box-shadow:0 0 0 2px #140c06,0 0 22px 6px rgba(160,130,255,.85)}
+
+  /* 깃발 받침과 배너 */
+  .pedestal{position:absolute;width:76px;height:76px;transform:translateZ(6px);transform-style:preserve-3d;border-radius:6px;
+    background:var(--grain-dark),linear-gradient(160deg,#6a4627,#432a16);box-shadow:inset 0 0 0 2px #24160b}
+  .pedestal::before{content:"";position:absolute;left:0;right:0;top:100%;height:18px;transform-origin:top;transform:rotateX(-90deg);
+    background:linear-gradient(180deg,#3a2414,#1d1108)}
+  .pedestal.f{left:560px;top:-8px} .pedestal.m{left:-114px;top:454px}
+  .banner{position:absolute;left:-12px;top:-58px;width:100px;height:134px;transform-origin:50% 100%;
+    transform:translateZ(2px) rotateX(-50deg);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;pointer-events:none}
+  .pedestal.m .banner{--team:var(--team-m)} .pedestal.f .banner{--team:var(--team-f)}
+  .banner svg{width:64px;height:84px;color:var(--team);filter:drop-shadow(0 4px 3px rgba(0,0,0,.6))}
+  .hex{margin-top:-6px;width:52px;height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:var(--team);
+    font-family:"Gowun Batang","Batang",serif;font-weight:700;color:#fff6e4;line-height:1}
+  .hex b{font-size:20px} .hex small{font-family:"IBM Plex Mono",monospace;font-size:8px;opacity:.8;margin-top:2px}
+  .pedestal.f .hex{box-shadow:none;filter:drop-shadow(0 0 10px var(--team-f-glow))}
+  .pedestal.m .hex{filter:drop-shadow(0 0 10px var(--team-m-glow))}
+
+  /* ============ HUD ============ */
+  .hud-top{position:absolute;left:28px;right:28px;top:12px;height:40px;z-index:5;
+    display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
+  .hud-top::after{content:"";position:absolute;left:0;right:0;bottom:-4px;height:1px;
+    background:linear-gradient(90deg,transparent,var(--hairline) 12%,var(--hairline) 88%,transparent)}
+  .brand{font-family:"Gowun Batang","Batang",serif;font-weight:700;font-size:17px;color:var(--ivory-dim);letter-spacing:.02em}
+  .title{display:flex;align-items:baseline;gap:6px;font-family:"Gowun Batang","Batang",serif;color:var(--ivory)}
+  .title b{font-size:24px;font-variant-numeric:tabular-nums} .title span{font-size:15px}
+  .title em{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.14em;color:var(--ivory-dim);margin-left:8px}
+  .tools{display:flex;justify-content:flex-end;gap:8px}
+  .tool{height:28px;min-width:28px;padding:0 9px;border-radius:14px;background:rgba(20,13,8,.65);color:var(--ivory);
+    border:1px solid var(--hairline);font-family:"IBM Plex Mono",monospace;font-size:11px;cursor:pointer}
+  .tool:hover:not(:disabled){border-color:var(--brass);color:var(--brass-hi)}
+  .tool.on{border-color:var(--brass);color:var(--brass-hi)}
+  .tool:disabled{opacity:.35;cursor:not-allowed}
+  .prompt{position:absolute;left:0;right:0;top:60px;z-index:5;text-align:center;font-size:12.5px;color:var(--ivory-dim);
+    text-shadow:0 1px 2px #000;pointer-events:none}
+
+  /* 코스트 (좌하단) */
+  .costbox{position:absolute;left:30px;bottom:26px;z-index:5;display:flex;flex-direction:column;gap:6px}
+  .gems{display:flex;gap:7px;padding-left:4px}
+  .gem{width:15px;height:15px;transform:rotate(45deg);border:1.5px solid var(--brass);background:transparent}
+  .gem.on{background:linear-gradient(135deg,var(--brass-hi),var(--brass));box-shadow:0 0 8px rgba(255,200,90,.6)}
+  .costnum{display:flex;align-items:baseline;gap:8px;font-family:"Gowun Batang","Batang",serif}
+  .costnum b{font-size:34px;color:var(--ivory);font-variant-numeric:tabular-nums;line-height:1}
+  .costnum span{font-size:12px;color:var(--ivory-dim)}
+  .pile{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ivory-dim)}
+  .pile b{color:var(--ivory);font-variant-numeric:tabular-nums}
+
+  /* 턴 종료 (우하단) */
+  .endturn{position:absolute;right:40px;bottom:16px;z-index:5;width:130px;height:150px;background:none;border:none;padding:0;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:30px;color:var(--ivory)}
+  .endturn .dia{width:78px;height:78px;transform:rotate(45deg);border:2px solid var(--brass-hi);
+    background:radial-gradient(circle at 35% 35%,#8a2f22,#4a130d);
+    box-shadow:0 0 0 4px rgba(20,13,8,.85),0 0 0 5px rgba(255,200,90,.5),0 0 26px 6px rgba(220,70,50,.55);
+    display:flex;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s}
+  .endturn .dia svg{width:38px;height:38px;transform:rotate(-45deg);color:var(--brass-hi)}
+  .endturn .lbl{font-family:"Gowun Batang","Batang",serif;font-weight:700;font-size:15px;letter-spacing:.06em;text-shadow:0 1px 2px #000}
+  .endturn:hover:not(:disabled) .dia{transform:rotate(45deg) scale(1.06);box-shadow:0 0 0 4px rgba(20,13,8,.85),0 0 0 5px rgba(255,200,90,.7),0 0 34px 10px rgba(230,80,55,.7)}
+  .endturn:disabled{cursor:not-allowed}
+  .endturn:disabled .dia{filter:grayscale(.85) brightness(.7);box-shadow:0 0 0 4px rgba(20,13,8,.85),0 0 0 5px rgba(241,229,201,.2)}
+  .endturn:disabled .lbl{color:var(--ivory-dim)}
+  .endturn:focus-visible .dia{outline:3px solid var(--brass-hi);outline-offset:4px}
+  .cancel{position:absolute;right:52px;bottom:172px;z-index:5;height:28px;padding:0 12px;border-radius:14px;
+    background:rgba(20,13,8,.75);color:var(--ivory);border:1px solid var(--hairline);font-size:12px;cursor:pointer}
+  .cancel[hidden]{display:none}
+
+  /* ============ 손패 카드 ============ */
+  .handlayer{position:absolute;left:0;right:0;bottom:0;height:0;z-index:6}
+  .stage.busy .handlayer{pointer-events:none}
+  .card{--team:var(--team-m);position:relative;width:120px;height:120px;border-radius:7px;color:#2b2118;
+    background:var(--grain-tile),linear-gradient(180deg,#f7ecd4,#e3cfa6);border:3px solid #3a2616;
+    box-shadow:inset 0 0 0 2px rgba(255,240,210,.55),0 8px 16px rgba(0,0,0,.6);
+    display:flex;flex-direction:column;align-items:center;overflow:hidden;text-align:center}
+  .card .art{flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;padding-top:9px;color:var(--team)}
+  .card .art svg{height:100%;max-height:58px;width:auto;overflow:visible;filter:drop-shadow(0 2px 1px rgba(0,0,0,.3))}
+  .card .nm{font-family:"Gowun Batang","Batang",serif;font-weight:700;font-size:13px;line-height:1.1;padding:1px 4px 3px;white-space:nowrap}
+  .card .st{width:100%;display:flex;justify-content:flex-start;gap:10px;padding:3px 8px 4px;background:#2e1f14;color:var(--ivory);
+    font-family:"Gowun Batang","Batang",serif;font-weight:700;font-size:16px;line-height:1.1;font-variant-numeric:tabular-nums}
+  .card .st span{display:flex;align-items:center;gap:3px}
+  .card .st svg{width:12px;height:12px}
+  .card .st .h{color:var(--hp)}
+  .card .cost{position:absolute;top:6px;left:6px;width:24px;height:24px;transform:rotate(45deg);
+    background:linear-gradient(135deg,#ffe3a0,#c9922c);border:2px solid var(--brass-dark);box-shadow:0 1px 2px rgba(0,0,0,.4)}
+  .card .cost b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform:rotate(-45deg);
+    font-family:"Gowun Batang","Batang",serif;font-size:14px;color:#2b1a06}
+  .card .spd{position:absolute;top:38px;left:4px;display:flex;align-items:center;gap:1px;padding:1px 5px 1px 3px;border-radius:9px;
+    background:#3b2a5c;color:#efe6ff;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;line-height:1.3}
+  .card .spd svg{width:9px;height:9px}
+  .card.hcard{position:absolute;left:var(--x);bottom:var(--y);z-index:var(--z);
+    transform:rotate(var(--r));transform-origin:50% 100%;transition:transform .16s ease,left .22s ease,bottom .22s ease,opacity .12s ease;
+    cursor:grab;touch-action:none}
+  .stage:not(.dragging):not(.busy) .card.hcard:hover{transform:translateY(-34px) scale(1.2);z-index:60}
+  .card.hcard.sel{transform:translateY(-24px);z-index:55;box-shadow:0 0 0 3px var(--brass-hi),0 0 20px rgba(255,200,90,.7),0 10px 18px rgba(0,0,0,.6)}
+  .card.hcard.no{filter:grayscale(1) brightness(.7);cursor:not-allowed}
+  .card.hcard.lift{opacity:.2}
+  .card.hcard:focus-visible{outline:3px solid var(--brass-hi);outline-offset:2px}
+  .handempty{position:absolute;left:0;right:0;bottom:48px;text-align:center;font-size:12px;color:var(--ivory-dim)}
+  .card.ghost{position:absolute;pointer-events:none;z-index:200;transform:translate(-50%,-50%) rotate(-3deg) scale(1.06);
+    box-shadow:0 18px 32px rgba(0,0,0,.7);opacity:.82}
+
+  /* ============ 연출 레이어 ============ */
+  .fx{position:absolute;inset:0;pointer-events:none;z-index:150}
+  .die{position:absolute;width:34px;height:34px;border-radius:7px;background:linear-gradient(160deg,#fffaf0,#e7d7b4);
+    border:2px solid #3a2616;box-shadow:0 3px 0 #3a2616,0 8px 14px rgba(0,0,0,.6);
+    display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:4px}
+  .die i{width:6px;height:6px;border-radius:50%;background:#2b2118;place-self:center;opacity:0}
+  .die i.on{opacity:1}
+  .die[data-tag]::after{content:attr(data-tag);position:absolute;left:50%;top:100%;transform:translate(-50%,6px);
+    font-family:"Gowun Batang","Batang",serif;font-size:12px;font-weight:700;color:var(--ivory);
+    background:rgba(20,13,8,.9);border:1px solid var(--hairline);border-radius:3px;padding:0 6px;white-space:nowrap}
+  .die.win{box-shadow:0 3px 0 #3a2616,0 0 18px 4px rgba(255,200,90,.8)}
+  .die.win::after{color:#1a120c;background:var(--brass);border-color:var(--brass-hi)}
+  .float{position:absolute;transform:translateX(-50%);font-family:"Gowun Batang","Batang",serif;font-weight:700;font-size:30px;
+    white-space:nowrap;color:#fff;text-shadow:0 2px 0 #000,0 0 10px rgba(0,0,0,.9)}
+  .float.good{color:#ffd36b} .float.bad{color:#ff7a5c}
+  .float.muted{color:var(--ivory-dim);font-size:15px}
+
+  /* ============ 서랍 · 오버레이 ============ */
+  .drawer{position:absolute;top:64px;right:20px;bottom:190px;width:330px;z-index:20;
+    background:rgba(16,10,6,.92);border:1px solid var(--hairline);border-radius:6px;padding:14px;
+    display:flex;flex-direction:column;box-shadow:0 12px 30px rgba(0,0,0,.6)}
+  .drawer[hidden]{display:none}
+  .drawer h2{font-family:"Gowun Batang","Batang",serif;font-size:15px;margin:0 0 8px;color:var(--ivory)}
+  .scroll{overflow-y:auto;min-height:0;flex:1}
+  #log{font-family:"IBM Plex Mono",monospace;font-size:10.5px;line-height:1.6;display:flex;flex-direction:column;gap:2px}
+  #log div{color:var(--ivory-dim);padding-bottom:2px;border-bottom:1px solid rgba(241,229,201,.08)}
+  #log div.hi{color:var(--ivory)} #log div.good{color:#9cc0ff} #log div.bad{color:#ff9a84} #log div.spd{color:var(--violet)}
+  .overlay{position:absolute;inset:0;background:rgba(5,3,2,.68);display:flex;align-items:center;justify-content:center;z-index:300}
+  .overlay[hidden]{display:none}
+  .sheet{background:var(--grain-tile),linear-gradient(180deg,#f7ecd4,#e6d3ad);color:#2b2118;border:3px solid #3a2616;border-radius:8px;
+    padding:26px 34px;box-shadow:0 18px 40px rgba(0,0,0,.7);max-width:620px;text-align:center}
+  .sheet h3{font-family:"Gowun Batang","Batang",serif;font-size:32px;margin:0 0 6px}
+  .sheet p{margin:0 0 18px;font-size:13px;color:#5b4a36;font-family:"IBM Plex Mono",monospace}
+  .sheet ul{text-align:left;margin:4px 0 20px;padding-left:18px;font-size:14px;line-height:1.65}
+  .sheet ul b{color:#1a120c}
+  .btn{font-family:"Gowun Batang","Batang",serif;font-weight:700;font-size:15px;padding:9px 22px;border-radius:5px;cursor:pointer;
+    background:linear-gradient(180deg,#d6a94b,#a97c25);border:2px solid var(--brass-dark);color:#fff8ea;text-shadow:0 1px 0 rgba(0,0,0,.35);
+    box-shadow:inset 0 1px 0 rgba(255,245,215,.45),0 3px 0 var(--brass-dark)}
+  .btn:focus-visible{outline:3px solid var(--brass-hi);outline-offset:3px}
+
+  /* ============ 시작 화면 · 메뉴 · 설정 ============ */
+  .scene,.table{transition:filter .5s ease}
+  .stage.on-title .scene{filter:blur(2.5px) brightness(.55)}
+  .stage.on-title .table{filter:brightness(.7)}
+  .stage.on-title .hud-top,.stage.on-title .prompt,.stage.on-title .costbox,.stage.on-title .endturn,
+  .stage.on-title .cancel,.stage.on-title .handlayer,.stage.on-title .drawer{opacity:0;pointer-events:none}
+  .hud-top,.prompt,.costbox,.endturn,.handlayer{transition:opacity .35s ease}
+  .stage.hide-ord .ord{display:none!important}
+
+  .titlescreen{position:absolute;inset:0;z-index:250;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse 55% 60% at 50% 50%, rgba(8,5,3,.35), rgba(8,5,3,.82) 80%)}
+  .titlescreen[hidden]{display:none}
+  .titlescreen .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.42em;color:var(--brass);margin-bottom:10px}
+  .titlescreen h1{margin:0;font-family:"Gowun Batang","Batang",serif;font-weight:700;font-size:84px;line-height:1;color:var(--ivory);
+    letter-spacing:.01em;text-shadow:0 4px 0 #120b06,0 0 40px rgba(255,190,110,.25)}
+  .titlescreen .flourish{display:flex;align-items:center;gap:12px;margin:16px 0 8px;color:var(--brass)}
+  .titlescreen .flourish i{display:block;width:120px;height:1px;background:linear-gradient(90deg,transparent,var(--brass))}
+  .titlescreen .flourish i:last-child{background:linear-gradient(90deg,var(--brass),transparent)}
+  .titlescreen .flourish b{width:9px;height:9px;transform:rotate(45deg);background:var(--brass);box-shadow:0 0 10px rgba(255,200,90,.6)}
+  .titlescreen .tagline{font-size:14px;color:var(--ivory-dim);margin-bottom:38px}
+  .menu{display:flex;flex-direction:column;align-items:stretch;gap:6px;width:300px}
+  .mitem{position:relative;display:flex;align-items:center;justify-content:center;gap:12px;height:50px;padding:0 20px;
+    background:transparent;border:1px solid transparent;border-radius:4px;cursor:pointer;color:var(--ivory);
+    font-family:"Gowun Batang","Batang",serif;font-weight:700;font-size:21px;letter-spacing:.06em;transition:background .15s,border-color .15s,color .15s}
+  .mitem::before,.mitem::after{content:"";width:8px;height:8px;transform:rotate(45deg);background:var(--brass);opacity:0;transition:opacity .15s}
+  .mitem:hover:not(:disabled),.mitem:focus-visible{background:linear-gradient(90deg,transparent,rgba(216,169,63,.16),transparent);
+    border-color:rgba(216,169,63,.35);color:var(--brass-hi);outline:none}
+  .mitem:hover:not(:disabled)::before,.mitem:hover:not(:disabled)::after,.mitem:focus-visible::before,.mitem:focus-visible::after{opacity:1}
+  .mitem:disabled{color:rgba(241,229,201,.3);cursor:not-allowed}
+  .mitem small{position:absolute;left:0;right:0;bottom:2px;text-align:center;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:400;letter-spacing:.04em;color:var(--ivory-dim)}
+  .mitem.note{padding-bottom:12px;height:56px}
+  .mitem:disabled small{color:rgba(241,229,201,.3)}
+  .titlescreen .foot{position:absolute;bottom:22px;left:0;right:0;text-align:center;font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.14em;color:rgba(241,229,201,.35)}
+
+  .sheet .menu{width:280px;margin:6px auto 0}
+  .sheet .mitem{color:#2b2118;font-size:18px;height:44px}
+  .sheet .mitem:hover:not(:disabled),.sheet .mitem:focus-visible{color:#1a120c;background:linear-gradient(90deg,transparent,rgba(184,134,43,.22),transparent);border-color:rgba(122,84,24,.35)}
+  .sheet .mitem::before,.sheet .mitem::after{background:#a97c25}
+  .overlay.top{z-index:320}
+  .setrow{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;text-align:left;padding:12px 2px;border-bottom:1px solid rgba(60,38,16,.18);min-width:440px}
+  .setrow b{display:block;font-family:"Gowun Batang","Batang",serif;font-size:17px;color:#1a120c}
+  .setrow span{font-size:12.5px;color:#5b4a36}
+  .switch{position:relative;width:52px;height:28px;border-radius:14px;border:2px solid #3a2616;background:#c9b48e;cursor:pointer;padding:0;transition:background .15s}
+  .switch::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff8ea;border:1.5px solid #3a2616;transition:left .15s}
+  .switch[aria-checked="true"]{background:#a97c25}
+  .switch[aria-checked="true"]::after{left:26px}
+  .switch:focus-visible{outline:3px solid var(--brass-hi);outline-offset:2px}
+  .sheet .actions{display:flex;justify-content:center;gap:10px;margin-top:18px}
+  .btn.ghost{background:transparent;color:#2b2118;text-shadow:none;border-color:#7a5418;box-shadow:none}
+
+  /* ============ 개발자 패널 ============ */
+  .dev{max-width:1280px;margin:0 auto;padding:0 16px;padding-block:20px 32px}
+  .devhead{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 12px;display:flex;align-items:center;gap:10px}
+  .devhead::after{content:"";flex:1;height:1px;background:var(--line2)}
+  .devgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+  @media(min-width:900px){ .devgrid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  .dpanel{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:12px}
+  .dpanel h2{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 9px;font-weight:400}
+  .threats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+  .threat{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border:1px solid var(--line);
+    border-radius:3px;background:var(--surface2);font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--muted)}
+  .threat .col{font-size:9px;letter-spacing:.1em}
+  .threat span{display:flex;gap:4px;align-items:baseline;white-space:nowrap}
+  .threat b{font-weight:700;font-variant-numeric:tabular-nums;font-size:12px}
+  .threat .tf b{color:var(--mine)} .threat .tm b{color:var(--foe)}
+  .threat.safe{opacity:.5}
+  table{width:100%;border-collapse:collapse;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-variant-numeric:tabular-nums}
+  th,td{text-align:right;padding:3px 5px;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child,td.tl,th.tl{text-align:left}
+  th{color:var(--muted);font-weight:400;font-size:9px;letter-spacing:.1em;text-transform:uppercase}
+  td.sp{color:var(--speed);font-weight:700}
+  td.nm{font-family:"Gowun Batang","Batang",serif;font-weight:700;font-size:11.5px;text-align:left}
+  .tablewrap{overflow-x:auto}
+  .note{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--muted);margin:8px 0 0;line-height:1.5}
+  .rules{font-size:12px;color:var(--muted);line-height:1.6;margin:0;padding-left:16px}
+  .rules li{margin-bottom:5px}
+  .rules b{color:var(--ink);font-weight:600}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<style>
+  body{background:var(--room)}
+  .viewport{min-height:100vh;align-items:center}
+</style>
+</head>
+<body>
+<div class="viewport" id="viewport">
+  <div class="holder" id="holder">
+    <div class="stage" id="stage">
+      <div class="table"></div>
+      <div class="lamp"></div>
+
+      <div class="scene" id="scene">
+        <div class="board3d" id="board3d">
+          <div class="boardshadow"></div>
+          <div class="frameface"></div>
+          <div class="pedestal f" id="flagF">
+            <div class="banner">
+              <svg viewBox="0 0 64 84" aria-hidden="true"><rect x="10" y="2" width="4" height="80" rx="2" fill="#3a2616" stroke="#140c06" stroke-width="1"/><circle cx="12" cy="3" r="3.5" fill="#d8a93f" stroke="#140c06"/><path d="M14 8h44l-9 13 9 13H14z" fill="currentColor" stroke="#140c06" stroke-width="2"/><path d="M26 15l8 6-8 6M34 15l8 6-8 6" stroke="#fff3dc" stroke-width="2.4" fill="none" opacity=".85"/></svg>
+              <div class="hex"><b id="foeNum">20</b><small>적군</small></div>
+            </div>
+          </div>
+          <div class="pedestal m" id="flagM">
+            <div class="banner">
+              <svg viewBox="0 0 64 84" aria-hidden="true"><rect x="10" y="2" width="4" height="80" rx="2" fill="#3a2616" stroke="#140c06" stroke-width="1"/><circle cx="12" cy="3" r="3.5" fill="#d8a93f" stroke="#140c06"/><path d="M14 8h44l-9 13 9 13H14z" fill="currentColor" stroke="#140c06" stroke-width="2"/><path d="M27 21l9-7 9 7-9 7z" fill="#fff3dc" opacity=".85"/></svg>
+              <div class="hex"><b id="myNum">20</b><small>청군</small></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="vignette"></div>
+
+      <header class="hud-top">
+        <div class="brand">Project Mio</div>
+        <div class="title"><b id="turnn">1</b><span>턴</span><em id="wavelabel"></em></div>
+        <div class="tools">
+          <button class="tool" id="speedBtn" type="button" title="연출 배속">×1</button>
+          <button class="tool" id="logBtn" type="button" title="전투 기록 열기">기록</button>
+          <button class="tool" id="helpBtn" type="button" title="게임 방법">?</button>
+          <button class="tool" id="menuBtn" type="button" title="메뉴 (Esc)">메뉴</button>
+        </div>
+      </header>
+      <div class="prompt" id="prompt"></div>
+
+      <div class="costbox">
+        <div class="gems" id="gems"></div>
+        <div class="costnum"><b id="costn">0/0</b><span>코스트</span></div>
+        <div class="pile">덱 <b id="deckn">0</b> · 손패 <b id="handn">0</b></div>
+      </div>
+
+      <div class="handlayer" id="hand"></div>
+
+      <button class="cancel" id="cancelBtn" type="button" hidden>선택 취소</button>
+      <button class="endturn" id="endBtn" type="button">
+        <span class="dia"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3l10 10M3.5 6.5l3-3M20 3L10 13M20.5 6.5l-3-3M8.5 15.5l-3 3M15.5 15.5l3 3M6 21l-2.5-2.5M18 21l2.5-2.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg></span>
+        <span class="lbl" id="endLbl">턴 종료</span>
+      </button>
+
+      <aside class="drawer" id="drawer" hidden>
+        <h2>전투 기록</h2>
+        <div class="scroll"><div id="log"></div></div>
+      </aside>
+
+      <div class="fx" id="fx"></div>
+
+      <div class="overlay top" id="help" hidden>
+        <div class="sheet">
+          <h3>게임 방법</h3>
+          <ul>
+            <li>손패의 병사를 <b>아래쪽 파란 칸</b>(청군 후열)으로 끌어다 놓는다. 코스트는 매 턴 1씩 늘어난다.</li>
+            <li><b>턴 종료</b>를 누르면 모든 병사가 한 칸씩 <b>전진</b>한 뒤, <b>속도(»)</b>가 빠른 순서로 싸운다.</li>
+            <li>병사는 <b>같은 열의 가장 가까운 적</b>을 친다. 앞에 아무도 없으면 적의 <b>깃발</b>을 친다.</li>
+            <li>속도가 같은 두 병사가 맞붙으면 <b>주사위</b>로 선공을 가린다. 보라색 테두리 순번이 맞대결 예고다.</li>
+            <li>적군 깃발을 먼저 0으로 만들면 승리.</li>
+          </ul>
+          <button class="btn" id="helpClose" type="button">닫기</button>
+        </div>
+      </div>
+      <div class="overlay" id="overlay" hidden></div>
+
+      <!-- 시작 화면 -->
+      <div class="titlescreen" id="title">
+        <div class="eyebrow">TABLETOP WARGAME</div>
+        <h1>Project Mio</h1>
+        <div class="flourish"><i></i><b></b><i></i></div>
+        <div class="tagline">손패의 병사를 내고, 속도로 겨루는 나무판 위의 전쟁</div>
+        <nav class="menu" aria-label="시작 메뉴">
+          <button class="mitem" id="tStart" type="button">게임 시작</button>
+          <button class="mitem note" id="tContinue" type="button">이어하기<small id="tContinueNote"></small></button>
+          <button class="mitem" id="tHelp" type="button">게임 방법</button>
+          <button class="mitem" id="tSettings" type="button">설정</button>
+        </nav>
+        <div class="foot">PROTOTYPE · 진행 상황은 이 브라우저에 자동 저장됩니다</div>
+      </div>
+
+      <!-- 게임 중 메뉴 -->
+      <div class="overlay" id="pause" hidden>
+        <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
+          <h3 id="pauseTitle">메뉴</h3>
+          <nav class="menu">
+            <button class="mitem" id="pResume" type="button">계속하기</button>
+            <button class="mitem" id="pSettings" type="button">설정</button>
+            <button class="mitem" id="pRestart" type="button">다시 시작</button>
+            <button class="mitem" id="pTitle" type="button">시작 화면으로</button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- 설정 -->
+      <div class="overlay top" id="settings" hidden>
+        <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+          <h3 id="setTitle">설정</h3>
+          <div class="setrow">
+            <div><b>행동 순번 표시</b><span>병사 머리 위에 이번 턴 행동 순서를 숫자로 보여줍니다.</span></div>
+            <button class="switch" id="optOrder" type="button" role="switch" aria-checked="true" aria-label="행동 순번 표시"></button>
+          </div>
+          <div class="setrow">
+            <div><b>화면 흔들림 줄이기</b><span>피격 흔들림을 끄고, 돌진·등장 움직임을 작게 합니다.</span></div>
+            <button class="switch" id="optCalm" type="button" role="switch" aria-checked="false" aria-label="화면 흔들림 줄이기"></button>
+          </div>
+          <div class="actions"><button class="btn" id="setClose" type="button">닫기</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<script>
+(function(){
+  "use strict";
+
+  /* ==================== 데이터 테이블 ==================== */
+  const CARDS = [
+    {id:1,  name:"견습 방패병", cls:"shield", cost:0, atk:1, hp:4, spd:1},
+    {id:2,  name:"견습 검병",   cls:"sword",  cost:0, atk:2, hp:1, spd:3},
+    {id:3,  name:"방패병",      cls:"shield", cost:1, atk:2, hp:5, spd:1},
+    {id:4,  name:"창병",        cls:"spear",  cost:1, atk:3, hp:3, spd:2},
+    {id:5,  name:"척후 기병",   cls:"cav",    cost:1, atk:3, hp:1, spd:4},
+    {id:6,  name:"중장 방패병", cls:"shield", cost:2, atk:3, hp:6, spd:1},
+    {id:7,  name:"정예 창병",   cls:"spear",  cost:2, atk:4, hp:4, spd:2},
+    {id:8,  name:"경기병",      cls:"cav",    cost:2, atk:4, hp:2, spd:4},
+    {id:9,  name:"미늘창병",    cls:"spear",  cost:3, atk:5, hp:5, spd:2},
+    {id:10, name:"창기병",      cls:"cav",    cost:3, atk:5, hp:3, spd:4},
+    {id:11, name:"근위 창병",   cls:"spear",  cost:4, atk:6, hp:6, spd:2},
+    {id:12, name:"기사",        cls:"cav",    cost:5, atk:7, hp:5, spd:4}
+  ];
+  const CLASS = {shield:"방패병", spear:"창병", sword:"검병", cav:"기병"};
+  CARDS.forEach(c=>{ c.rank = CARDS.filter(o=>o.cls===c.cls && o.cost<c.cost).length + 1; });
+  const DECK_LIST = [
+    {id:1,n:2},{id:2,n:2},{id:3,n:2},{id:4,n:2},{id:5,n:2},{id:6,n:2},
+    {id:7,n:2},{id:8,n:2},{id:9,n:1},{id:10,n:1},{id:11,n:1},{id:12,n:1}
+  ];
+  const WAVES = [
+    {until:2, pool:[1,2,3,5],    label:"초반"},
+    {until:4, pool:[3,4,5,7,8],  label:"중반"},
+    {until:6, pool:[6,7,8,9,10], label:"후반"},
+    {until:99,pool:[9,10,11,12], label:"종반"}
+  ];
+  const ROWS = [
+    {r:0, name:"적군 후열"}, {r:1, name:"적군 전열"}, {r:2, name:"청군 전열"}, {r:3, name:"청군 후열"}
+  ];
+  const MY_DEPLOY = 3, FOE_DEPLOY = 0, MY_MIN_ROW = 1, FOE_MAX_ROW = 2;
+  const FLAG_HP = 20, COST_CAP = 10, START_HAND = 3, HAND_MAX = 8;
+  /* 적군 배치 매수: 1~2턴은 1장, 3턴부터 이 확률로 2장 (밸런스 조정: 0.5 → 0.25, 시뮬 승률 38% → 57%) */
+  const FOE_DOUBLE_CHANCE = 0.25;
+  const STAGE_W = 1280, STAGE_H = 720;
+  /* 보드 평면 좌표 (3D 보드 안) */
+  const FRAME = 22, TILE = 112, GAP = 10, PITCH = TILE + GAP;
+  const LUNGE = 44, DIE = 34;
+  const FAN = {cx:640, cardW:120, maxSpread:640, maxGap:112, tilt:4, maxTilt:16, dip:2.2, maxDip:26, baseY:6};
+  const DRAG_THRESHOLD = 6;
+
+  /* 연출 타이밍 (ms, ×1 기준) — 카드 1장 행동 = windup+lunge+impact+recover+settle = 1000 */
+  const T = {
+    windup:250, lunge:180, impact:170, recover:230, settle:170,
+    blocked:580, skip:400, advance:320,
+    diceRoll:700, diceShow:400, diceHold:450, diceFade:200,
+    float:800, place:200, returnHand:200, foeDrop:300, draw:260
+  };
+  const T_LABEL = {
+    windup:"행동 준비 (강조)", lunge:"돌진", impact:"타격 · 피격 흔들림", recover:"복귀", settle:"정리 (파괴 연출 포함)",
+    blocked:"막힘 흔들림", skip:"차례 전 파괴 표시", advance:"전진 슬라이드",
+    diceRoll:"주사위 굴림", diceShow:"주사위 결과 표시", diceHold:"선공 표시 유지", diceFade:"주사위 사라짐",
+    float:"피해 숫자 (병렬)", place:"배치 내려앉기", returnHand:"드롭 실패 복귀", foeDrop:"적군 배치 등장", draw:"드로우 등장"
+  };
+  const ACT_TOTAL = T.windup + T.lunge + T.impact + T.recover + T.settle;
+  const PIPS = {1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+
+  /* ==================== 미니어처 아트 (SVG) ====================
+     currentColor = 진영 색. 외곽선이 있는 채색 피규어. */
+  const OL="#1a120c", SKIN="#e2b07e", STEEL="#b5bdc5", STEEL_D="#77808a", LEATHER="#6b4426", WOOD="#8d5b33", PANTS="#3e2c1e", HORSE="#8a5a3a", HORSE_D="#5e3b24";
+  const S = 'stroke="'+OL+'" stroke-width="1.5" stroke-linejoin="round"';
+  function soldier(){
+    return '<path d="M22 39h5v15.5h-5zM29 39h5v15.5h-5z" fill="'+PANTS+'" '+S+'/>'
+      + '<path d="M20.5 54h7v3.6h-7zM27.5 54h7v3.6h-7z" fill="'+LEATHER+'" '+S+'/>'
+      + '<path d="M20.5 20h13l2 19.5h-17z" fill="'+STEEL+'" '+S+'/>'
+      + '<path d="M23 21.5h8l1.4 17.5h-10.8z" fill="currentColor" '+S+'/>'
+      + '<rect x="20.2" y="31" width="15" height="2.8" fill="'+LEATHER+'" '+S+'/>'
+      + '<circle cx="27" cy="13.2" r="5.6" fill="'+SKIN+'" '+S+'/>'
+      + '<path d="M20.6 13a6.4 6.4 0 0 1 12.8 0h1.7v2.1h-16.2V13z" fill="'+STEEL+'" '+S+'/>'
+      + '<path d="M26 6.6c-.4-3 2.6-4.8 2.6-4.8s1.2 3-.8 4.8z" fill="currentColor" '+S+'/>';
+  }
+  const UNIT_ART = {
+    shield: soldier()
+      + '<path d="M30 24h8v4h-8z" fill="'+STEEL_D+'" '+S+'/>'
+      + '<path d="M33 18.5h18.5v15.5c0 9.6-9.25 15.6-9.25 15.6S33 43.6 33 34z" fill="currentColor" '+S+' stroke-width="2"/>'
+      + '<path d="M42.25 21v26M35.6 30.5h13.3" stroke="#fff4dd" stroke-width="2.2"/>'
+      + '<path d="M33 18.5h18.5" stroke="'+STEEL+'" stroke-width="2.4"/>',
+    spear: soldier()
+      + '<path d="M31 25h11v3.8H31z" fill="'+STEEL_D+'" '+S+'/>'
+      + '<rect x="41.3" y="9" width="3.2" height="51" rx="1" fill="'+WOOD+'" '+S+'/>'
+      + '<path d="M42.9 0l4.8 10.2h-9.6z" fill="'+STEEL+'" '+S+'/>'
+      + '<path d="M44.5 12l10.5 3.6-10.5 3.6z" fill="currentColor" '+S+'/>',
+    sword: soldier()
+      + '<circle cx="17.5" cy="30" r="6.4" fill="currentColor" '+S+' stroke-width="1.8"/>'
+      + '<circle cx="17.5" cy="30" r="2" fill="'+STEEL+'" '+S+'/>'
+      + '<path d="M31 27.5l6-3" stroke="'+OL+'" stroke-width="4.2" stroke-linecap="round"/><path d="M31 27.5l6-3" stroke="'+STEEL_D+'" stroke-width="2.2" stroke-linecap="round"/>'
+      + '<path d="M37.6 26.2L52 5.5l3.2 2.2-14.4 20.6z" fill="'+STEEL+'" '+S+'/>'
+      + '<path d="M34.5 23.6l7.6 5" stroke="'+OL+'" stroke-width="4" stroke-linecap="round"/><path d="M34.5 23.6l7.6 5" stroke="#c9952c" stroke-width="2" stroke-linecap="round"/>',
+    cav: '<path d="M9.5 37.5q-5.5 5.5-3.3 13.5q3.2-6 6.5-8.3z" fill="'+HORSE_D+'" '+S+'/>'
+      + '<rect x="13" y="45" width="3.8" height="15" rx="1" fill="'+HORSE_D+'" '+S+'/><rect x="38.4" y="45" width="3.8" height="15" rx="1" fill="'+HORSE_D+'" '+S+'/>'
+      + '<ellipse cx="27" cy="40" rx="17" ry="8.6" fill="'+HORSE+'" '+S+'/>'
+      + '<rect x="20" y="45.5" width="3.8" height="14.5" rx="1" fill="'+HORSE+'" '+S+'/><rect x="32" y="45.5" width="3.8" height="14.5" rx="1" fill="'+HORSE+'" '+S+'/>'
+      + '<path d="M38 36.5L46.8 20l7.4 2-5.2 18z" fill="'+HORSE+'" '+S+'/>'
+      + '<path d="M46.8 19l11.4 4.2-1.6 5.2-9.4-2.2z" fill="'+HORSE+'" '+S+'/>'
+      + '<path d="M44 21l4-4 1.2 3.6z" fill="'+HORSE_D+'" '+S+'/>'
+      + '<path d="M15.5 32.5h21v10h-21z" fill="currentColor" '+S+'/>'
+      + '<path d="M15.5 42.5l3 3 3-3 3 3 3-3 3 3 3-3 3 3 3-3" fill="none" stroke="'+OL+'" stroke-width="1.2"/>'
+      + '<path d="M22 16.8h9l1.6 16.2H20.6z" fill="'+STEEL+'" '+S+'/>'
+      + '<path d="M23.6 18.5h6l1 12h-8z" fill="currentColor" '+S+'/>'
+      + '<circle cx="26.5" cy="11" r="5" fill="'+SKIN+'" '+S+'/>'
+      + '<path d="M20.6 10.8a5.9 5.9 0 0 1 11.8 0h1.4v1.8H19.2v-1.8z" fill="'+STEEL+'" '+S+'/>'
+      + '<path d="M29.6 23.2L61 9.2l1.2 2.6L31.2 26.4z" fill="'+WOOD+'" '+S+'/>'
+      + '<path d="M57.8 8l6.6-1.6-3.2 5.4z" fill="'+STEEL+'" '+S+'/>'
+      + '<path d="M50 12.6l3.6 6.2 4.4-5.2z" fill="currentColor" '+S+'/>'
+  };
+  const unitSvg = cls => '<svg viewBox="0 0 64 64" aria-hidden="true">'+UNIT_ART[cls]+'</svg>';
+  const ICON = {
+    atk:'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.2 1.2l1.6 1.6-7.6 7.6-1.6-1.6z" fill="currentColor"/><path d="M3.2 8.6l4.2 4.2M4.3 11.7l-2.6 2.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    hp:'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14.2C2.2 9.8 1.2 6.6 3 4.2c1.8-2.1 4-1.4 5 .4 1-1.8 3.2-2.5 5-.4 1.8 2.4.8 5.6-5 10z" fill="currentColor"/></svg>',
+    spd:'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l5 5-5 5M8.5 3l5 5-5 5" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    glyph:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3l10 10M3.5 6.5l3-3M20 3L10 13M20.5 6.5l-3-3M8.5 15.5l-3 3M15.5 15.5l3 3M6 21l-2.5-2.5M18 21l2.5-2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>'
+  };
+
+  const def = id => CARDS.find(c => c.id===id) || CARDS[0];
+
+  /* ==================== 저장 · 설정 ====================
+     브라우저 저장소는 막혀 있을 수 있으므로 모든 접근을 try/catch로 감싼다. */
+  const SAVE_KEY = "projectmio.save.v1", SETTINGS_KEY = "projectmio.settings.v1";
+  function loadJSON(k){ try{ const v=localStorage.getItem(k); return v ? JSON.parse(v) : null; }catch(e){ return null; } }
+  function saveJSON(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  function removeKey(k){ try{ localStorage.removeItem(k); }catch(e){} }
+  const settings = Object.assign({showOrder:true, calm:false}, loadJSON(SETTINGS_KEY) || {});
+  /* 화면 흔들림 줄이기: 이동 거리 배율 */
+  const mv = px => settings.calm ? Math.round(px*0.35) : px;
+  const RM = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+  /* ==================== 상태 ==================== */
+  let state, uid = 0, booted = false, busy = false, SPEED = 1, screen = "title";
+
+  const mk = (id, foe) => { const d=def(id); return {uid:++uid, id, name:d.name, cls:d.cls, rank:d.rank, cost:d.cost, a:d.atk, h:d.hp, max:d.hp, spd:d.spd, foe:!!foe}; };
+  function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+  function buildDeck(){ const d=[]; DECK_LIST.forEach(e=>{ for(let k=0;k<e.n;k++) d.push(e.id); }); return shuffle(d); }
+  const emptyGrid = () => [0,1,2,3].map(()=>[null,null,null,null]);
+
+  function newBattle(){
+    state = {
+      turn:0, phase:"play", myFlag:FLAG_HP, foeFlag:FLAG_HP,
+      cost:0, costMax:0, deck:buildDeck(), hand:[], grid:emptyGrid(),
+      sel:null, log:[], over:null, turnOrder:null
+    };
+    for(let i=0;i<START_HAND;i++) drawCard(true);
+    say("전투 시작. 양쪽 깃발 내구도 "+FLAG_HP+".","hi");
+    foePlace(1);
+    startTurn();
+  }
+  function say(t,c){ state.log.unshift({t, c:c||""}); if(state.log.length>150) state.log.pop(); }
+
+  /* ==================== 좌표 ==================== */
+  function findPos(card, grid){
+    grid = grid || state.grid;
+    for(let r=0;r<4;r++) for(let c=0;c<4;c++) if(grid[r][c] && grid[r][c].uid===card.uid) return {r,c};
+    return null;
+  }
+  function findByUid(u){
+    for(let r=0;r<4;r++) for(let c=0;c<4;c++){ const x=state.grid[r][c]; if(x && x.uid===u) return x; }
+    return null;
+  }
+  function allOnBoard(grid){
+    grid = grid || state.grid;
+    const list=[];
+    for(let r=0;r<4;r++) for(let c=0;c<4;c++) if(grid[r][c]) list.push({r,c,card:grid[r][c]});
+    return list;
+  }
+  const sideTag = o => o.foe ? "적군 " : "청군 ";
+  const nameOf = o => sideTag(o)+o.name;
+  const posTag = p => (p.c+1)+"열 "+ROWS[p.r].name;
+  const cloneGrid = g => g.map(row=>row.slice());
+
+  /* ==================== 연출 유틸 ==================== */
+  const stage = document.getElementById("stage");
+  const fx = document.getElementById("fx");
+  const dur = ms => RM ? 1 : ms/SPEED;
+  const wait = ms => new Promise(res => setTimeout(res, ms/SPEED));
+  function anim(node, frames, ms, easing){
+    if(!node || !node.animate) return Promise.resolve();
+    try{
+      const a = node.animate(frames, {duration:dur(ms), easing:easing||"ease", fill:"forwards"});
+      return a.finished.catch(()=>{});
+    }catch(e){ return Promise.resolve(); }
+  }
+  function rectInStage(node){
+    const s=stage.getBoundingClientRect(), k=s.width/STAGE_W, r=node.getBoundingClientRect();
+    return {x:(r.left-s.left)/k, y:(r.top-s.top)/k, w:r.width/k, h:r.height/k};
+  }
+  const pieceNode = u => document.querySelector('.piece[data-uid="'+u+'"]');
+  const miniOf = p => p ? (p.querySelector(".mini") || p) : null;
+  const handCardEl = u => document.querySelector('.handlayer .card[data-uid="'+u+'"]');
+  function floatAt(target, text, cls){
+    if(!target) return;
+    const r=rectInStage(target);
+    const f=el("div","float "+(cls||""), text);
+    f.style.left=(r.x+r.w/2)+"px"; f.style.top=(r.y+r.h*0.2)+"px";
+    fx.appendChild(f);
+    anim(f,[{translate:"0 0",opacity:1,scale:"1.25"},{translate:"0 -10px",opacity:1,scale:"1",offset:.25},{translate:"0 -38px",opacity:0,scale:"1"}], T.float, "ease-out").then(()=>f.remove());
+  }
+  const shake = (node, ms) => settings.calm ? Promise.resolve() : anim(node, [{translate:"0 0"},{translate:"-6px 0"},{translate:"6px 0"},{translate:"-3px 0"},{translate:"0 0"}], ms);
+
+  /* ==================== 턴 ==================== */
+  function drawCard(silent){
+    if(!state.deck.length){ if(!silent) say("덱이 비어 뽑지 못했다."); return null; }
+    if(state.hand.length >= HAND_MAX){ if(!silent) say("손패가 가득 차(상한 "+HAND_MAX+") 드로우를 건너뛰었다."); return null; }
+    const c = mk(state.deck.pop());
+    state.hand.push(c);
+    if(!silent) say(c.name+"을(를) 뽑았다.");
+    return c.uid;
+  }
+  function startTurn(){
+    state.turn++;
+    state.costMax = Math.min(state.costMax+1, COST_CAP);
+    state.cost = state.costMax;
+    state.turnOrder = null;
+    const drawn = drawCard();
+    state.phase="play"; state.sel=null;
+    say("― "+state.turn+"턴 시작 · 코스트 "+state.cost+" ―","hi");
+    return drawn;
+  }
+
+  async function endTurn(){
+    if(state.phase!=="play" || state.over || busy) return;
+    busy = true;
+    state.sel=null; state.phase="resolve";
+    stage.classList.add("busy");
+    render();
+    try{
+      await advanceAnimated();
+      await combatAnimated();
+      if(state.over){ finish(); return; }
+      const placed = foePlace(state.turn<=2 ? 1 : (Math.random()<FOE_DOUBLE_CHANCE ? 2 : 1));
+      render();
+      await Promise.all(placed.map(u => anim(miniOf(pieceNode(u)), [{translate:"0 "+mv(-60)+"px",opacity:0},{translate:"0 "+mv(4)+"px",opacity:1,offset:.75},{translate:"0 0",opacity:1}], T.foeDrop, "ease-in")));
+      const drawn = startTurn();
+      render();
+      if(drawn) await anim(handCardEl(drawn), [{translate:"0 120px",opacity:0},{translate:"0 0",opacity:1}], T.draw, "ease-out");
+    } finally {
+      busy = false;
+      stage.classList.remove("busy");
+      render();
+    }
+  }
+  function finish(){
+    state.phase="over";
+    removeKey(SAVE_KEY);
+    say(state.over==="win" ? "승리 — 적군 깃발이 무너졌다." : "패배 — 청군 깃발이 무너졌다.", state.over==="win"?"good":"bad");
+  }
+
+  /* ==================== 전진 (후열 우선) ==================== */
+  function tierOf(card, r){
+    if(card.foe) return r===FOE_DEPLOY ? 0 : r===1 ? 1 : 2;
+    return r===MY_DEPLOY ? 0 : r===2 ? 1 : 2;
+  }
+  function computeAdvance(grid){
+    const list = allOnBoard(grid);
+    list.sort((a,b)=>(tierOf(a.card,a.r)-tierOf(b.card,b.r)) || (a.c-b.c) || (a.card.foe===b.card.foe ? 0 : a.card.foe ? 1 : -1));
+    const moved=new Set(), moves=[];
+    for(let pass=0; pass<3; pass++){
+      for(const o of list){
+        if(moved.has(o.card.uid)) continue;
+        const nr = o.r + (o.card.foe ? 1 : -1);
+        if(o.card.foe ? nr>FOE_MAX_ROW : nr<MY_MIN_ROW) continue;
+        if(grid[nr][o.c]) continue;
+        grid[nr][o.c]=o.card; grid[o.r][o.c]=null;
+        moved.add(o.card.uid);
+        moves.push({uid:o.card.uid, card:o.card, from:o.r, to:nr, c:o.c});
+      }
+    }
+    return moves;
+  }
+  async function advanceAnimated(){
+    const moves = computeAdvance(state.grid);
+    if(!moves.length){ say("전진 없음.","spd"); renderLog(); return; }
+    say("전진(후열 우선): "+moves.map(m=>nameOf(m.card)+" "+(m.c+1)+"열 "+ROWS[m.from].name+"→"+ROWS[m.to].name).join(", "),"spd");
+    renderLog();
+    await Promise.all(moves.map(m=>anim(pieceNode(m.uid), [{translate:"0 0"},{translate:"0 "+((m.to-m.from)*PITCH)+"px"}], T.advance, "ease-in-out")));
+    render();
+  }
+
+  /* ==================== 전투 ==================== */
+  function hitFlag(card, amt){
+    if(card.foe) state.myFlag  = Math.max(0, state.myFlag  - amt);
+    else         state.foeFlag = Math.max(0, state.foeFlag - amt);
+  }
+  function finished(){
+    if(state.over) return true;
+    if(state.foeFlag<=0){ state.over="win";  return true; }
+    if(state.myFlag <=0){ state.over="lose"; return true; }
+    return false;
+  }
+  function kill(card){
+    const p=findPos(card); if(!p) return;
+    state.grid[p.r][p.c]=null;
+    say(nameOf(card)+" 파괴 ("+posTag(p)+").", card.foe?"good":"bad");
+  }
+  function scanTarget(card, p, grid){
+    grid = grid || state.grid;
+    const step = card.foe ? 1 : -1;
+    for(let rr=p.r+step; rr>=0 && rr<=3; rr+=step){
+      const t=grid[rr][p.c];
+      if(!t) continue;
+      if(t.foe===card.foe) return {blocked:true, by:t};
+      return {target:t};
+    }
+    return {flag:true};
+  }
+  function duelPartner(card, grid){
+    grid = grid || state.grid;
+    const p=findPos(card, grid); if(!p) return null;
+    const res=scanTarget(card, p, grid);
+    if(!res.target || res.target.spd!==card.spd) return null;
+    const t=res.target, back=scanTarget(t, findPos(t, grid), grid);
+    return (back.target && back.target.uid===card.uid) ? t : null;
+  }
+  const baseOrder = list => list.sort((a,b)=>(b.spd-a.spd) || (a.col-b.col) || (a.foe===b.foe ? 0 : a.foe ? 1 : -1));
+
+  async function combatAnimated(){
+    const list = baseOrder(allOnBoard().map(o=>({uid:o.card.uid, id:o.card.id, name:o.card.name, foe:o.card.foe, spd:o.card.spd, col:o.c, rolls:[], status:"wait"})));
+    state.turnOrder = list;
+    say("― 속도순 전투 ("+list.length+"체) ―","hi");
+    renderOrder(); renderLog();
+    const diced = new Set();
+
+    for(let i=0;i<list.length;i++){
+      let entry=list[i], card=findByUid(entry.uid);
+      if(!card){
+        entry.status="dead";
+        say(nameOf(entry)+"[S"+entry.spd+"]는 차례 전에 파괴돼 행동 불가.","spd");
+        renderLog();
+        await wait(T.skip);
+        continue;
+      }
+      const partner = duelPartner(card);
+      if(partner){
+        const j = list.findIndex((e,k)=>k>i && e.uid===partner.uid && e.status==="wait");
+        const key = [card.uid, partner.uid].sort((a,b)=>a-b).join("-");
+        if(j>i && !diced.has(key)){
+          diced.add(key);
+          const winner = await duel(entry, list[j]);
+          if(winner===partner.uid){
+            const [w]=list.splice(j,1); list.splice(i,0,w);
+            entry=list[i]; card=findByUid(entry.uid);
+            renderOrder();
+          }
+        }
+      }
+      entry.status="acting"; renderOrder();
+      await actAnimated(card);
+      entry.status="done";
+      render();
+      if(finished()) return;
+    }
+  }
+
+  async function actAnimated(card){
+    const p=findPos(card), pc=pieceNode(card.uid), mini=miniOf(pc);
+    const tag=nameOf(card)+"[S"+card.spd+"]";
+    const dir=card.foe ? 1 : -1;
+    if(pc) pc.classList.add("acting");
+    await wait(T.windup);
+
+    if(card.a<=0){
+      say(tag+" 공격력 0 — 행동 없음.");
+      floatAt(mini, "대기", "muted");
+      await wait(T.lunge+T.impact+T.recover+T.settle);
+      return;
+    }
+    const res=scanTarget(card, p);
+    if(res.blocked){
+      say(tag+" 앞을 아군 "+res.by.name+"이(가) 막아 행동하지 못했다.");
+      floatAt(mini, "막힘", "muted");
+      await anim(pc, [{translate:"0 0",offset:0},{translate:"0 "+(dir*mv(10))+"px",offset:.15},{translate:"0 0",offset:.35},{translate:"0 0",offset:1}], T.blocked);
+      await wait(T.settle);
+      return;
+    }
+
+    await anim(pc, [{translate:"0 0"},{translate:"0 "+(dir*mv(LUNGE))+"px"}], T.lunge, "cubic-bezier(.55,0,1,.45)");
+
+    let target=null;
+    if(res.flag){
+      hitFlag(card, card.a);
+      const fl=document.getElementById(card.foe ? "flagM" : "flagF");
+      const hex=fl.querySelector(".hex");
+      floatAt(hex, "-"+card.a, card.foe?"bad":"good");
+      shake(fl.querySelector(".banner"), T.impact);
+      renderFlags();
+      say(tag+" → 깃발 "+card.a+" 피해", card.foe?"bad":"good");
+    } else {
+      target=res.target;
+      const tp=pieceNode(target.uid);
+      target.h -= card.a;
+      floatAt(miniOf(tp), "-"+card.a, target.foe?"good":"bad");
+      if(tp){
+        shake(tp, T.impact);
+        const hs=tp.querySelector(".plaque .h"), hv=tp.querySelector(".hv");
+        if(hv) hv.textContent=Math.max(0,target.h);
+        if(hs) hs.classList.add("hurt");
+      }
+      say(tag+" → "+nameOf(target)+"에 "+card.a+" 피해 (체력 "+Math.max(0,target.h)+"/"+target.max+")");
+    }
+    renderLog();
+    await wait(T.impact);
+    await anim(pc, [{translate:"0 "+(dir*mv(LUNGE))+"px"},{translate:"0 0"}], T.recover, "ease-out");
+
+    if(target && target.h<=0){
+      await anim(pieceNode(target.uid), [{opacity:1,scale:"1"},{opacity:0,scale:".55"}], T.settle, "ease-in");
+      kill(target);
+    } else {
+      await wait(T.settle);
+    }
+  }
+
+  /* ==================== 맞대결 주사위 ==================== */
+  function makeDie(v){ const d=el("div","die"); for(let i=0;i<9;i++) d.appendChild(el("i")); setFace(d,v); return d; }
+  function setFace(d,v){ const on=PIPS[v]; for(let i=0;i<9;i++) d.children[i].className = on.includes(i) ? "on" : ""; }
+  const rollD6 = () => 1+Math.floor(Math.random()*6);
+
+  async function rollPair(entries, vals, dieEls){
+    const dice = entries.map(e=>{
+      if(dieEls[e.uid]) dieEls[e.uid].remove();
+      const m=miniOf(pieceNode(e.uid)); if(!m) return null;
+      const r=rectInStage(m);
+      const d=makeDie(rollD6());
+      d.style.left=(r.x+r.w/2-DIE/2)+"px"; d.style.top=(r.y+r.h*0.35-DIE/2)+"px";
+      fx.appendChild(d); dieEls[e.uid]=d;
+      return d;
+    });
+    dice.forEach(d => d && anim(d, settings.calm ? [{opacity:0},{opacity:1}] : [{rotate:"-260deg",scale:".4",opacity:0,translate:"0 -30px"},{rotate:"0deg",scale:"1",opacity:1,translate:"0 0"}], T.diceRoll, "cubic-bezier(.2,.8,.3,1)"));
+    await new Promise(res=>{
+      const t0=performance.now(), total=dur(T.diceRoll);
+      (function tick(){
+        if(performance.now()-t0 >= total) return res();
+        dice.forEach(d => d && setFace(d, rollD6()));
+        setTimeout(tick, 70);
+      })();
+    });
+    dice.forEach((d,i)=>{ if(d){ setFace(d, vals[i]); anim(d,[{scale:"1.4"},{scale:"1"}],170,"ease-out"); } });
+    await wait(T.diceShow);
+  }
+
+  async function duel(ea, eb){
+    const pair=[ea, eb], dieEls={};
+    pair.forEach(e=>{ const p=pieceNode(e.uid); if(p) p.classList.add("duel"); });
+    say("맞대결 동속도 S"+ea.spd+": "+nameOf(ea)+" vs "+nameOf(eb)+" — 주사위","spd");
+    renderLog();
+    let va, vb, rounds=0;
+    do{
+      va=rollD6(); vb=rollD6();
+      await rollPair(pair, [va,vb], dieEls);
+      ea.rolls.push(va); eb.rolls.push(vb);
+      rounds++;
+      if(va===vb && rounds<6){ say("눈이 같다("+va+"). 다시 굴린다.","spd"); renderLog(); }
+    } while(va===vb && rounds<6);
+    const aWins = va>vb || (va===vb && Math.random()<0.5);
+    const w = aWins ? ea : eb, l = aWins ? eb : ea;
+    if(dieEls[w.uid]){ dieEls[w.uid].dataset.tag="선공"; dieEls[w.uid].classList.add("win"); }
+    if(dieEls[l.uid]) dieEls[l.uid].dataset.tag="후공";
+    say("주사위 결과 → "+nameOf(w)+"("+w.rolls.join("→")+") 선공, "+nameOf(l)+"("+l.rolls.join("→")+") 후공","spd");
+    renderLog();
+    await wait(T.diceHold);
+    await Promise.all(Object.values(dieEls).map(d=>anim(d,[{opacity:1},{opacity:0}],T.diceFade)));
+    Object.values(dieEls).forEach(d=>d.remove());
+    pair.forEach(e=>{ const p=pieceNode(e.uid); if(p) p.classList.remove("duel"); });
+    return w.uid;
+  }
+
+  /* ==================== AI ==================== */
+  const wave = () => WAVES.find(w => state.turn<=w.until) || WAVES[WAVES.length-1];
+  function threatToFoeFlag(col){
+    let front=-1;
+    for(let r=1;r<=3;r++){ const x=state.grid[r][col]; if(x && !x.foe){ front=r; break; } }
+    if(front<0) return 0;
+    for(let r=0;r<front;r++){ const y=state.grid[r][col]; if(y && y.foe) return 0; }
+    return state.grid[front][col].a;
+  }
+  function threatToMyFlag(col){
+    let front=-1;
+    for(let r=2;r>=0;r--){ const x=state.grid[r][col]; if(x && x.foe){ front=r; break; } }
+    if(front<0) return 0;
+    for(let r=front+1;r<=3;r++){ const y=state.grid[r][col]; if(y && !y.foe) return 0; }
+    return state.grid[front][col].a;
+  }
+  function myCardsIn(col){ let n=0; for(let r=1;r<=3;r++){ const x=state.grid[r][col]; if(x && !x.foe) n++; } return n; }
+  function pickFoeCard(pool, mode){
+    let best=null, bestKey=-1;
+    pool.forEach(id=>{
+      const d=def(id);
+      const key = mode==="defend" ? d.spd*100+d.hp : mode==="attack" ? d.atk*100+d.spd : Math.random()*100;
+      if(key>bestKey){ bestKey=key; best=id; }
+    });
+    return best;
+  }
+  function foePlace(count){
+    const w=wave(), placed=[];
+    for(let k=0;k<count;k++){
+      const cands=[];
+      for(let c=0;c<4;c++){
+        if(state.grid[FOE_DEPLOY][c]) continue;
+        const threat=threatToFoeFlag(c);
+        let mode, score;
+        if(threat>0){ mode="defend"; score=2000+threat*10; }
+        else if(myCardsIn(c)===0){ mode="attack"; score=1000; }
+        else { mode="hold"; score=100; }
+        cands.push({col:c, mode, score, threat, tie:Math.random()});
+      }
+      if(!cands.length){ if(!placed.length) say("적군 후열이 가득 차 배치하지 못했다."); break; }
+      cands.sort((a,b)=>(b.score-a.score)||(a.tie-b.tie));
+      const p=cands[0], id=pickFoeCard(w.pool, p.mode), card=mk(id, true);
+      state.grid[FOE_DEPLOY][p.col]=card;
+      placed.push(card.uid);
+      const why = p.mode==="defend" ? "방어 (깃발 위협 "+p.threat+")" : p.mode==="attack" ? "공격 (빈 열)" : "보강";
+      say("적군 배치 → "+(p.col+1)+"열 "+why+" · "+def(id).name+"[S"+def(id).spd+"]");
+    }
+    return placed;
+  }
+
+  /* ==================== 배치 ==================== */
+  function pickHand(u){
+    if(state.phase!=="play" || state.over || busy) return;
+    if(state.sel && state.sel.uid===u){ state.sel=null; render(); return; }
+    const card=state.hand.find(c=>c.uid===u);
+    if(!card || card.cost>state.cost) return;
+    state.sel=card; render();
+  }
+  function place(col){
+    if(state.phase!=="play" || busy || !state.sel || state.grid[MY_DEPLOY][col]) return;
+    const card=state.sel;
+    if(card.cost>state.cost) return;
+    state.cost -= card.cost;
+    state.hand = state.hand.filter(c=>c.uid!==card.uid);
+    state.grid[MY_DEPLOY][col]=card;
+    say(card.name+"을(를) "+(col+1)+"열 청군 후열에 배치 (코스트 -"+card.cost+", 속도 "+card.spd+").","hi");
+    state.sel=null; render();
+    anim(miniOf(pieceNode(card.uid)), [{translate:"0 "+mv(-40)+"px",opacity:.4},{translate:"0 "+mv(3)+"px",opacity:1,offset:.75},{translate:"0 0",opacity:1}], T.place, "ease-in");
+  }
+
+  /* 드래그 앤 드롭 — 포인터 이벤트. 6px 이상 움직이면 드래그, 아니면 클릭. 판정은 커서 위치. */
+  let drag=null;
+  function stagePoint(cx, cy){ const r=stage.getBoundingClientRect(), k=r.width/STAGE_W; return {x:(cx-r.left)/k, y:(cy-r.top)/k}; }
+  function deploySlotAt(cx, cy){
+    for(const e of document.elementsFromPoint(cx, cy)){
+      const s=e.closest ? e.closest(".slot") : null;
+      if(s && s.dataset.r===String(MY_DEPLOY) && !state.grid[MY_DEPLOY][+s.dataset.c]) return s;
+    }
+    return null;
+  }
+  function beginDrag(){
+    drag.active=true; state.sel=null;
+    stage.classList.add("dragging");
+    document.querySelectorAll(".card.hcard.sel").forEach(x=>x.classList.remove("sel"));
+    drag.el.classList.add("lift");
+    const g=cardEl(drag.card,{}); g.className+=" ghost";
+    stage.appendChild(g); drag.ghost=g;
+    document.querySelectorAll('.slot[data-r="'+MY_DEPLOY+'"]').forEach(s=>{ if(!state.grid[MY_DEPLOY][+s.dataset.c]) s.classList.add("open"); });
+  }
+  function moveDrag(cx, cy){
+    const p=stagePoint(cx, cy);
+    drag.ghost.style.left=p.x+"px"; drag.ghost.style.top=p.y+"px";
+    const s=deploySlotAt(cx, cy);
+    if(drag.hover && drag.hover!==s) drag.hover.classList.remove("target");
+    if(s) s.classList.add("target");
+    drag.hover=s;
+  }
+  async function endDrag(d, cx, cy){
+    const s=deploySlotAt(cx, cy);
+    stage.classList.remove("dragging");
+    if(s){ d.ghost.remove(); state.sel=d.card; place(+s.dataset.c); return; }
+    const home=rectInStage(d.el);
+    await anim(d.ghost, [{left:d.ghost.style.left, top:d.ghost.style.top},{left:(home.x+home.w/2)+"px", top:(home.y+home.h/2)+"px"}], T.returnHand, "ease-out");
+    d.ghost.remove(); render();
+  }
+  function cancelDrag(d){ if(d.ghost) d.ghost.remove(); stage.classList.remove("dragging"); render(); }
+  function bindHandCard(e, c){
+    e.addEventListener("pointerdown", ev=>{
+      if(ev.button!==0 || state.phase!=="play" || state.over || busy) return;
+      drag={uid:c.uid, card:c, el:e, sx:ev.clientX, sy:ev.clientY, active:false};
+      try{ e.setPointerCapture(ev.pointerId); }catch(_){}
+    });
+    e.addEventListener("pointermove", ev=>{
+      if(!drag || drag.uid!==c.uid) return;
+      if(!drag.active){
+        if(Math.hypot(ev.clientX-drag.sx, ev.clientY-drag.sy) < DRAG_THRESHOLD) return;
+        if(c.cost>state.cost) return;
+        beginDrag();
+      }
+      moveDrag(ev.clientX, ev.clientY);
+    });
+    e.addEventListener("pointerup", ev=>{
+      if(!drag || drag.uid!==c.uid) return;
+      const d=drag; drag=null;
+      try{ e.releasePointerCapture(ev.pointerId); }catch(_){}
+      if(d.active) endDrag(d, ev.clientX, ev.clientY); else pickHand(c.uid);
+    });
+    e.addEventListener("pointercancel", ()=>{ if(drag && drag.uid===c.uid){ const d=drag; drag=null; if(d.active) cancelDrag(d); } });
+    e.addEventListener("keydown", ev=>{ if(ev.key==="Enter" || ev.key===" "){ ev.preventDefault(); pickHand(c.uid); } });
+  }
+
+  /* ==================== 렌더 ==================== */
+  function el(t,c,x){ const e=document.createElement(t); if(c) e.className=c; if(x!=null) e.textContent=x; return e; }
+
+  /* 손패 카드 */
+  function cardEl(card,o){
+    o=o||{};
+    const e=el("div","card"+(o.hand?" hcard":"")+(o.sel?" sel":"")+(o.no?" no":""));
+    e.dataset.uid=card.uid;
+    const cost=el("div","cost"); cost.appendChild(el("b",null,String(card.cost))); e.appendChild(cost);
+    const sp=el("div","spd"); sp.innerHTML=ICON.spd; sp.appendChild(document.createTextNode(String(card.spd))); e.appendChild(sp);
+    const art=el("div","art"); art.innerHTML=unitSvg(card.cls); e.appendChild(art);
+    e.appendChild(el("div","nm",card.name));
+    const st=el("div","st");
+    const a=el("span","a"); a.innerHTML=ICON.atk; a.appendChild(el("b",null,String(card.a)));
+    const h=el("span","h"); h.innerHTML=ICON.hp; h.appendChild(el("b",null,String(card.h)));
+    st.appendChild(a); st.appendChild(h); e.appendChild(st);
+    e.title=card.name+" ("+CLASS[card.cls]+") · 코스트 "+card.cost+" · 공격력 "+card.a+" · 체력 "+card.h+" · 속도 "+card.spd;
+    return e;
+  }
+
+  /* 보드 위 미니어처 */
+  function pieceEl(card){
+    const p=el("div","piece "+(card.foe?"f":"m"));
+    p.dataset.uid=card.uid;
+    p.appendChild(el("div","base"));
+    const m=el("div","mini");
+    const ord=el("div","ord"); ord.hidden=true; m.appendChild(ord);
+    const art=el("div","art"); art.innerHTML=unitSvg(card.cls); m.appendChild(art);
+    const pl=el("div","plaque");
+    const a=el("span","a"); a.innerHTML=ICON.atk; a.appendChild(el("b",null,String(card.a)));
+    const h=el("span","h"+(card.h<card.max?" hurt":"")); h.innerHTML=ICON.hp; h.appendChild(el("b","hv",String(Math.max(0,card.h))));
+    const s=el("span","s"); s.innerHTML=ICON.spd; s.appendChild(el("b",null,String(card.spd)));
+    pl.appendChild(a); pl.appendChild(h); pl.appendChild(s);
+    m.appendChild(pl);
+    m.title=nameOf(card)+" ("+CLASS[card.cls]+") · 공격력 "+card.a+" · 체력 "+card.h+"/"+card.max+" · 속도 "+card.spd;
+    p.appendChild(m);
+    return p;
+  }
+
+  function renderBoard(){
+    const b=document.getElementById("board3d");
+    b.querySelectorAll(".slot").forEach(n=>n.remove());
+    for(let r=0;r<4;r++) for(let col=0;col<4;col++){
+      const zone = r===FOE_DEPLOY ? " zone-f" : r===MY_DEPLOY ? " zone-m" : "";
+      const slot=el("div","slot"+zone);
+      slot.style.left=(FRAME+col*PITCH)+"px"; slot.style.top=(FRAME+r*PITCH)+"px";
+      slot.dataset.r=r; slot.dataset.c=col;
+      if(zone){ const g=el("i","glyph"); g.innerHTML=ICON.glyph; slot.appendChild(g); }
+      const card=state.grid[r][col];
+      if(card) slot.appendChild(pieceEl(card));
+      else if(r===MY_DEPLOY && state.sel && state.phase==="play"){
+        slot.className+=" open"; slot.tabIndex=0;
+        slot.setAttribute("aria-label",(col+1)+"열 청군 후열에 배치");
+        slot.addEventListener("keydown",ev=>{ if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); place(col); } });
+      }
+      if(r===MY_DEPLOY) slot.addEventListener("click",()=>place(col));
+      b.appendChild(slot);
+    }
+  }
+
+  function renderHand(){
+    const layer=document.getElementById("hand"); layer.innerHTML="";
+    const n=state.hand.length;
+    if(!n){ layer.appendChild(el("div","handempty","손패가 비었다.")); return; }
+    const gap = n>1 ? Math.min(FAN.maxGap, FAN.maxSpread/(n-1)) : 0;
+    const mid = (n-1)/2;
+    state.hand.forEach((c,i)=>{
+      const off=i-mid;
+      const x=FAN.cx + off*gap - FAN.cardW/2;
+      const y=FAN.baseY - Math.min(FAN.maxDip, off*off*FAN.dip);
+      const r=Math.max(-FAN.maxTilt, Math.min(FAN.maxTilt, off*FAN.tilt));
+      const no = state.phase==="play" && !state.over && c.cost>state.cost;
+      const e=cardEl(c,{hand:true, sel:state.sel && state.sel.uid===c.uid, no});
+      e.style.setProperty("--x", x+"px"); e.style.setProperty("--y", y+"px");
+      e.style.setProperty("--r", r+"deg"); e.style.setProperty("--z", String(i+1));
+      e.tabIndex=0; e.setAttribute("role","button");
+      e.setAttribute("aria-label",c.name+", 코스트 "+c.cost+", 공격력 "+c.a+", 체력 "+c.h+", 속도 "+c.spd);
+      bindHandCard(e, c);
+      layer.appendChild(e);
+    });
+  }
+
+  function renderFlags(){
+    document.getElementById("foeNum").textContent=state.foeFlag;
+    document.getElementById("myNum").textContent=state.myFlag;
+  }
+
+  /* 행동 순서 → 유닛 머리 위 순번 */
+  function orderInfo(){
+    const m=new Map();
+    if(state.turnOrder){
+      state.turnOrder.forEach((e,i)=>m.set(e.uid,{n:i+1, status:e.status}));
+      return m;
+    }
+    const g=cloneGrid(state.grid);
+    computeAdvance(g);
+    const list=baseOrder(allOnBoard(g).map(o=>({uid:o.card.uid, foe:o.card.foe, spd:o.card.spd, col:o.c})));
+    list.forEach((e,i)=>m.set(e.uid,{n:i+1, status:"plan", duel:!!duelPartner(findByUid(e.uid), g)}));
+    return m;
+  }
+  function renderOrder(){
+    const info=orderInfo();
+    document.querySelectorAll(".piece").forEach(p=>{
+      const o=p.querySelector(".ord"), i=info.get(+p.dataset.uid);
+      if(!o) return;
+      if(!i){ o.hidden=true; return; }
+      o.hidden=false;
+      o.className="ord "+(i.status||"")+(i.duel?" duel":"");
+      o.textContent=i.n;
+      o.title = i.duel ? "행동 순번 "+i.n+" · 맞대결 주사위 예정" : "행동 순번 "+i.n;
+    });
+  }
+
+  function renderHud(){
+    document.getElementById("turnn").textContent=state.turn;
+    document.getElementById("wavelabel").textContent="배치 풀 "+wave().label;
+    document.getElementById("deckn").textContent=state.deck.length;
+    document.getElementById("handn").textContent=state.hand.length+"/"+HAND_MAX;
+    document.getElementById("costn").textContent=state.cost+"/"+state.costMax;
+    const gems=document.getElementById("gems"); gems.innerHTML="";
+    for(let i=0;i<state.costMax;i++) gems.appendChild(el("i","gem"+(i<state.cost?" on":"")));
+    document.getElementById("speedBtn").textContent="×"+SPEED;
+    document.getElementById("menuBtn").disabled=busy;
+    document.getElementById("logBtn").classList.toggle("on", !document.getElementById("drawer").hidden);
+
+    let t;
+    if(state.over) t = state.over==="win" ? "승리 — 적군 깃발이 무너졌다." : "패배 — 청군 깃발이 무너졌다.";
+    else if(busy) t = "전투 진행 중…";
+    else if(state.sel) t = state.sel.name+" 선택됨 — 파란 칸을 눌러 배치";
+    else t = "병사를 파란 칸으로 끌어다 놓으세요";
+    document.getElementById("prompt").textContent=t;
+
+    const end=document.getElementById("endBtn");
+    end.disabled = state.phase!=="play" || !!state.over || busy;
+    document.getElementById("endLbl").textContent = busy ? "진행 중…" : "턴 종료";
+    document.getElementById("cancelBtn").hidden = !state.sel;
+  }
+
+  function renderLog(){
+    const lg=document.getElementById("log"); if(!lg) return;
+    lg.innerHTML="";
+    state.log.forEach(l=>lg.appendChild(el("div",l.c,l.t)));
+  }
+
+  function renderOverlay(){
+    const ov=document.getElementById("overlay");
+    if(!state.over || screen==="title"){ ov.hidden=true; ov.innerHTML=""; return; }
+    ov.hidden=false; ov.innerHTML="";
+    const v=el("div","sheet");
+    v.appendChild(el("h3",null,state.over==="win"?"승리":"패배"));
+    v.appendChild(el("p",null,"청군 깃발 "+state.myFlag+" · 적군 깃발 "+state.foeFlag+" · "+state.turn+"턴"));
+    const row=el("div","actions");
+    const b=el("button","btn","다시 시작"); b.type="button";
+    b.addEventListener("click",()=>{ newBattle(); render(); });
+    const t=el("button","btn ghost","시작 화면으로"); t.type="button";
+    t.addEventListener("click",()=>{ showTitle(); });
+    row.appendChild(b); row.appendChild(t); v.appendChild(row); ov.appendChild(v);
+  }
+
+  /* 개발자 패널 */
+  function renderThreats(){
+    const box=document.getElementById("threats"); if(!box) return;
+    box.innerHTML="";
+    for(let c=0;c<4;c++){
+      const tf=threatToFoeFlag(c), tm=threatToMyFlag(c);
+      const cell=el("div","threat"+(tf===0&&tm===0?" safe":""));
+      cell.appendChild(el("span","col",(c+1)+"열"));
+      const a=el("span","tf"); a.appendChild(document.createTextNode("적군")); a.appendChild(el("b",null,String(tf)));
+      const b=el("span","tm"); b.appendChild(document.createTextNode("청군")); b.appendChild(el("b",null,String(tm)));
+      cell.appendChild(a); cell.appendChild(b); box.appendChild(cell);
+    }
+  }
+  function renderTables(){
+    const t=document.getElementById("cardtable");
+    if(t && !t.childElementCount){
+      const head=document.createElement("tr");
+      ["#","이름","병종","계급","코스트","공격","체력","속도","덱"].forEach((x,i)=>{ const th=document.createElement("th"); th.textContent=x; if(i<3) th.className="tl"; head.appendChild(th); });
+      t.appendChild(head);
+      CARDS.forEach(c=>{
+        const n=(DECK_LIST.find(d=>d.id===c.id)||{n:0}).n;
+        const tr=document.createElement("tr");
+        [[c.id,"tl"],[c.name,"nm"],[CLASS[c.cls],"tl"],["◆".repeat(c.rank),""],[c.cost,""],[c.atk,""],[c.hp,""],[c.spd,"sp"],[n,""]].forEach(cv=>{
+          const td=document.createElement("td"); if(cv[1]) td.className=cv[1]; td.textContent=cv[0]; tr.appendChild(td);
+        });
+        t.appendChild(tr);
+      });
+    }
+    const tt=document.getElementById("timingtable");
+    if(tt && !tt.childElementCount){
+      const head=document.createElement("tr");
+      ["연출","키","ms"].forEach(x=>{ const th=document.createElement("th"); th.textContent=x; head.appendChild(th); });
+      tt.appendChild(head);
+      Object.keys(T).forEach(k=>{
+        const tr=document.createElement("tr");
+        [T_LABEL[k], k, T[k]].forEach(v=>{ const td=document.createElement("td"); td.textContent=v; tr.appendChild(td); });
+        tt.appendChild(tr);
+      });
+      document.getElementById("timingNote").textContent =
+        "카드 1장 행동 = windup + lunge + impact + recover + settle = "+ACT_TOTAL+"ms. 막힌 카드 = windup + blocked + settle = "+(T.windup+T.blocked+T.settle)+"ms. 주사위는 맞대결이 생길 때만 추가된다. 연출 배속(×2, ×4)은 모든 값을 나눈다.";
+    }
+  }
+
+  function render(){
+    renderHud(); renderBoard(); renderOrder(); renderFlags(); renderLog();
+    renderHand(); renderOverlay(); renderThreats(); renderTables();
+    applySettings(); renderScreen(); persist();
+  }
+
+  /* ==================== 화면 전환 · 저장 ==================== */
+  const titleEl=document.getElementById("title"), pauseEl=document.getElementById("pause"), setEl=document.getElementById("settings");
+  function persist(){
+    if(screen!=="game" || busy || !state || state.over) return;
+    saveJSON(SAVE_KEY, {v:1, uid, state:Object.assign({}, state, {sel:null, turnOrder:null})});
+  }
+  function loadSave(){
+    const sv=loadJSON(SAVE_KEY);
+    if(!sv || sv.v!==1 || !sv.state || !sv.state.grid || sv.state.grid.length!==4 || sv.state.over) return null;
+    return sv;
+  }
+  function useSave(sv){
+    state=sv.state; state.sel=null; state.turnOrder=null;
+    if(state.phase==="resolve") state.phase="play";
+    uid=Math.max(uid, sv.uid||0)+1;
+  }
+  function applySettings(){
+    stage.classList.toggle("hide-ord", !settings.showOrder);
+    document.getElementById("optOrder").setAttribute("aria-checked", String(!!settings.showOrder));
+    document.getElementById("optCalm").setAttribute("aria-checked", String(!!settings.calm));
+  }
+  function renderScreen(){
+    const onTitle = screen==="title";
+    stage.classList.toggle("on-title", onTitle);
+    titleEl.hidden = !onTitle;
+    if(onTitle){
+      const sv=loadSave(), cont=document.getElementById("tContinue");
+      cont.disabled=!sv;
+      document.getElementById("tContinueNote").textContent = sv ? sv.state.turn+"턴" : "저장된 전투 없음";
+    }
+  }
+  /* 시작 화면 배경용 전시 배치 (실제 게임에는 쓰지 않음) */
+  function showcase(){
+    newBattle();
+    const put=(r,c,id,foe)=>{ state.grid[r][c]=mk(id,foe); };
+    put(0,1,10,true); put(1,2,7,true); put(0,3,12,true);
+    put(2,1,9,false); put(3,0,6,false); put(3,2,8,false); put(2,3,4,false);
+    state.log=[];
+  }
+  function showTitle(){
+    screen="title"; pauseEl.hidden=true; document.getElementById("drawer").hidden=true;
+    render(); document.getElementById("tStart").focus();
+  }
+  function startGame(){
+    removeKey(SAVE_KEY); fx.innerHTML="";
+    newBattle(); screen="game"; render();
+  }
+  function continueGame(){
+    const sv=loadSave(); if(!sv) return;
+    useSave(sv); fx.innerHTML=""; screen="game"; render();
+  }
+  function openPause(){
+    if(screen!=="game" || busy || state.over) return;
+    pauseEl.hidden=false; document.getElementById("pResume").focus();
+  }
+  function openSettings(){ setEl.hidden=false; document.getElementById("optOrder").focus(); }
+
+  /* ==================== 16:9 스케일 ==================== */
+  const viewport=document.getElementById("viewport"), holder=document.getElementById("holder");
+  function fit(){
+    const cs=getComputedStyle(viewport);
+    const aw=viewport.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const ah=Math.max(180, window.innerHeight - 32);
+    let k=Math.min(aw/STAGE_W, ah/STAGE_H);
+    if(!(k>0)) k=0.5;
+    stage.style.transform="scale("+k+")";
+    holder.style.width =(STAGE_W*k)+"px";
+    holder.style.height=(STAGE_H*k)+"px";
+  }
+  window.addEventListener("resize", fit);
+  try{ new ResizeObserver(fit).observe(viewport); }catch(e){}
+  fit();
+
+  const drawer=document.getElementById("drawer"), help=document.getElementById("help");
+  document.getElementById("menuBtn").addEventListener("click",openPause);
+  document.getElementById("tStart").addEventListener("click",startGame);
+  document.getElementById("tContinue").addEventListener("click",continueGame);
+  document.getElementById("tHelp").addEventListener("click",()=>{ help.hidden=false; document.getElementById("helpClose").focus(); });
+  document.getElementById("tSettings").addEventListener("click",openSettings);
+  document.getElementById("pResume").addEventListener("click",()=>{ pauseEl.hidden=true; });
+  document.getElementById("pSettings").addEventListener("click",openSettings);
+  document.getElementById("pRestart").addEventListener("click",()=>{ pauseEl.hidden=true; startGame(); });
+  document.getElementById("pTitle").addEventListener("click",showTitle);
+  document.getElementById("setClose").addEventListener("click",()=>{ setEl.hidden=true; });
+  document.getElementById("optOrder").addEventListener("click",()=>{ settings.showOrder=!settings.showOrder; saveJSON(SETTINGS_KEY,settings); applySettings(); });
+  document.getElementById("optCalm").addEventListener("click",()=>{ settings.calm=!settings.calm; saveJSON(SETTINGS_KEY,settings); applySettings(); });
+  [pauseEl, setEl].forEach(o=>o.addEventListener("click",ev=>{ if(ev.target===o) o.hidden=true; }));
+  window.addEventListener("keydown",ev=>{
+    if(ev.key!=="Escape") return;
+    if(!setEl.hidden){ setEl.hidden=true; return; }
+    if(!help.hidden){ help.hidden=true; return; }
+    if(!pauseEl.hidden){ pauseEl.hidden=true; return; }
+    if(!drawer.hidden){ drawer.hidden=true; renderHud(); return; }
+    openPause();
+  });
+  document.getElementById("endBtn").addEventListener("click",endTurn);
+  document.getElementById("cancelBtn").addEventListener("click",()=>{ state.sel=null; render(); });
+  document.getElementById("speedBtn").addEventListener("click",()=>{ SPEED = SPEED===1 ? 2 : SPEED===2 ? 4 : 1; renderHud(); });
+  document.getElementById("logBtn").addEventListener("click",()=>{ drawer.hidden=!drawer.hidden; renderLog(); renderHud(); });
+  document.getElementById("helpBtn").addEventListener("click",()=>{ help.hidden=false; document.getElementById("helpClose").focus(); });
+  document.getElementById("helpClose").addEventListener("click",()=>{ help.hidden=true; });
+  help.addEventListener("click",ev=>{ if(ev.target===help) help.hidden=true; });
+
+  /* ==================== 부팅 ==================== */
+  function start(saved){
+    if(booted) return;
+    booted=true;
+    if(saved && saved.v===5 && saved.state && saved.state.grid && saved.state.grid.length===4){
+      state=saved.state; uid=10000; screen=saved.screen||"title";
+      if(state.phase==="resolve"){ state.phase="play"; state.turnOrder=null; }
+      if(typeof saved.speed==="number") SPEED=saved.speed;
+    } else {
+      const sv=loadSave();
+      if(sv) useSave(sv); else showcase();
+      screen="title";
+    }
+    render(); fit();
+  }
+  try{
+    if(window.claude && window.claude.hot && window.claude.hot.ready){
+      window.claude.hot.ready(start);
+      window.claude.hot.snapshot(()=>({v:5, state, speed:SPEED, screen}));
+    } else {
+      start((window.claude && window.claude.hot && window.claude.hot.data) || {});
+    }
+  }catch(e){ start({}); }
+})();
+</script>
+</body>
+</html>
