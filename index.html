@@ -45,7 +45,7 @@
   .theme-btn:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
   .wrap { max-width: 960px; margin: 0 auto; padding: 72px 20px 56px; }
 
-  header { margin-bottom: 48px; }
+  header { margin-bottom: 32px; }
   .eyebrow { color: var(--acc); font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
   h1 { font-size: clamp(32px, 6vw, 48px); line-height: 1.15; margin: 8px 0 0; letter-spacing: -.02em; }
 
@@ -58,11 +58,22 @@
   }
   .card:hover { background: var(--card-hover); border-color: var(--acc); transform: translateY(-2px); }
   .card:focus-visible { outline: 2px solid var(--acc); outline-offset: 3px; }
-  .num { color: var(--mute); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+  .chip {
+    background: var(--card); color: var(--mute); border: 1px solid var(--line); border-radius: 999px;
+    padding: 7px 16px; font: inherit; font-size: 14px; cursor: pointer; transition: color .15s, border-color .15s, background .15s;
+  }
+  .chip:hover { color: var(--fg); border-color: var(--acc); }
+  .chip.on { background: var(--acc); border-color: var(--acc); color: var(--bg); font-weight: 600; }
+  .chip:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+  .card[hidden] { display: none; }
+  .empty { color: var(--mute); text-align: center; padding: 48px 0; margin: 0; }
+  .meta { display: flex; justify-content: space-between; color: var(--mute); font-size: 12px; font-variant-numeric: tabular-nums; }
   .card h2 { font-size: 20px; margin: 6px 0 8px; letter-spacing: -.01em; }
   .card p { color: var(--mute); margin: 0 0 18px; flex: 1; }
   .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
   .tag { font-size: 12px; color: var(--fg); background: var(--tag-bg); border-radius: 999px; padding: 3px 10px; }
+  .tag.cat { color: var(--acc); background: transparent; box-shadow: inset 0 0 0 1px var(--acc); }
   .go { color: var(--acc); font-weight: 600; font-size: 14px; }
   .go::after { content: " →"; }
 
@@ -76,31 +87,41 @@
     <h1>프로토타입 아카이브</h1>
   </header>
 
-  <main class="grid">
-    <a class="card" href="project-mio/">
-      <span class="num">01</span>
+  <nav class="filters" aria-label="태그 필터">
+    <button class="chip on" type="button" data-filter="all">전체</button>
+    <button class="chip" type="button" data-filter="전투">전투</button>
+    <button class="chip" type="button" data-filter="시스템">시스템</button>
+    <button class="chip" type="button" data-filter="레벨 디자인">레벨 디자인</button>
+    <button class="chip" type="button" data-filter="게임">게임</button>
+  </nav>
+
+  <main class="grid" id="grid">
+    <!-- 새 프로토타입은 data-date(올린 날짜)와 data-cat(필터 태그, 여러 개면 쉼표)만 맞춰 넣으면 자동으로 최신순 정렬된다 -->
+    <a class="card" href="project-mio/" data-date="2026-10-29" data-order="1" data-cat="게임">
+      <span class="meta"><span class="num">01</span><span class="date">2026.10.29</span></span>
       <h2>Project Mio</h2>
       <p>손패의 병사를 내고, 속도로 겨루는 나무판 위의 전쟁.</p>
-      <div class="tags"><span class="tag">카드 배틀</span><span class="tag">HTML</span></div>
+      <div class="tags"><span class="tag cat">게임</span><span class="tag">카드 배틀</span><span class="tag">HTML</span></div>
       <span class="go">플레이</span>
     </a>
 
-    <a class="card" href="valorant-greybox/">
-      <span class="num">02</span>
+    <a class="card" href="valorant-greybox/" data-date="2026-10-29" data-order="2" data-cat="레벨 디자인">
+      <span class="meta"><span class="num">02</span><span class="date">2026.10.29</span></span>
       <h2>발로란트 신규 맵 그레이박스</h2>
       <p>신규 맵 레벨 디자인을 3D 그레이박스로 확인한다. 공격·수비 스폰에서 직접 걸어 볼 수 있다.</p>
-      <div class="tags"><span class="tag">레벨 디자인</span><span class="tag">3D</span><span class="tag">FPS</span></div>
+      <div class="tags"><span class="tag cat">레벨 디자인</span><span class="tag">3D</span><span class="tag">FPS</span></div>
       <span class="go">플레이</span>
     </a>
 
-    <a class="card" href="iris/">
-      <span class="num">03</span>
+    <a class="card" href="iris/" data-date="2026-10-30" data-order="3" data-cat="전투">
+      <span class="meta"><span class="num">03</span><span class="date">2026.10.30</span></span>
       <h2>아이리스 — 이터널리턴 신규 캐릭터</h2>
       <p>방망이로 내리찍어 띄우고, 사슬로 묶어 끌어온다. 훈련장에서 스킬과 예시 콤보를 직접 확인할 수 있다.</p>
-      <div class="tags"><span class="tag">전투 기획</span><span class="tag">캐릭터</span><span class="tag">3D</span></div>
+      <div class="tags"><span class="tag cat">전투</span><span class="tag">캐릭터</span><span class="tag">3D</span></div>
       <span class="go">플레이</span>
     </a>
   </main>
+  <p class="empty" id="empty" hidden>아직 이 태그의 프로토타입이 없다.</p>
 
 </div>
 <script>
@@ -118,6 +139,33 @@
       apply(next);
       try { localStorage.setItem('archive-theme', next); } catch (e) {}
     });
+  })();
+
+  (function () {
+    var grid = document.getElementById('grid'), empty = document.getElementById('empty');
+    var cards = Array.prototype.slice.call(grid.querySelectorAll('.card'));
+    // 최신순: 날짜가 늦은 것 먼저, 같은 날이면 나중에 올린 것(data-order가 큰 것) 먼저
+    cards.sort(function (a, b) {
+      if (a.dataset.date !== b.dataset.date) return a.dataset.date < b.dataset.date ? 1 : -1;
+      return Number(b.dataset.order) - Number(a.dataset.order);
+    }).forEach(function (c) { grid.appendChild(c); });
+
+    var chips = document.querySelectorAll('.chip');
+    function filter(tag) {
+      var shown = 0;
+      cards.forEach(function (c) {
+        var cats = c.dataset.cat.split(',').map(function (t) { return t.trim(); });
+        var ok = tag === 'all' || cats.indexOf(tag) !== -1;
+        c.hidden = !ok; if (ok) shown++;
+      });
+      empty.hidden = shown > 0;
+      chips.forEach(function (ch) {
+        var on = ch.dataset.filter === tag;
+        ch.classList.toggle('on', on); ch.setAttribute('aria-pressed', on);
+      });
+    }
+    chips.forEach(function (ch) { ch.addEventListener('click', function () { filter(ch.dataset.filter); }); });
+    filter('all');
   })();
 </script>
 </body>
