@@ -355,7 +355,7 @@ function faceMouse() { P.face = Math.atan2(mouse.y - P.y, mouse.x - P.x); }
    사운드 — 코드로 합성한다 (Web Audio). 파일 없이 동작한다
    ========================================================= */
 const SFX = (() => {
-  let ctx = null, master = null, noiseBuf = null, charge = null, revIn = null, drive = null;
+  let ctx = null, master = null, noiseBuf = null, revIn = null, drive = null;
   let on = true, vol = 0.6;
   try { on = localStorage.getItem('iris.sound') !== '0'; const v = parseFloat(localStorage.getItem('iris.vol')); if (!isNaN(v)) vol = v; } catch (e) {}
   function ensure() {
@@ -422,36 +422,9 @@ const SFX = (() => {
   return {
     unlock() { if (on) ensure(); },
     isOn: () => on, getVol: () => vol,
-    setOn(v) { on = v; if (master) master.gain.value = on ? vol : 0; if (!on) this.chargeStop(); try { localStorage.setItem('iris.sound', on ? '1' : '0'); } catch (e) {} },
+    setOn(v) { on = v; if (master) master.gain.value = on ? vol : 0; try { localStorage.setItem('iris.sound', on ? '1' : '0'); } catch (e) {} },
     setVol(v) { vol = v; if (master && on) master.gain.value = vol; try { localStorage.setItem('iris.vol', String(v)); } catch (e) {} },
 
-    // Q 차징: 땅이 울리는 낮은 진동 — 차지할수록 커지고 거칠어진다
-    chargeStart() {
-      if (!ready() || charge) return;
-      const t = ctx.currentTime;
-      const o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
-      o.type = 'sawtooth'; o.frequency.value = 42; lp.type = 'lowpass'; lp.frequency.value = 140; lp.Q.value = 2;
-      const src = ctx.createBufferSource(), nlp = ctx.createBiquadFilter(), ng = ctx.createGain();
-      src.buffer = noiseBuf; src.loop = true; nlp.type = 'lowpass'; nlp.frequency.value = 180; ng.gain.value = 0.9;
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.12);
-      o.connect(lp); src.connect(nlp); nlp.connect(ng); ng.connect(lp); lp.connect(g); g.connect(drive);
-      o.start(t); src.start(t);
-      charge = { o, src, lp, nlp, g };
-    },
-    chargeUpdate(f) {
-      if (!charge) return;
-      const t = ctx.currentTime;
-      charge.o.frequency.setTargetAtTime(42 + 30 * f, t, 0.05);
-      charge.lp.frequency.setTargetAtTime(140 + 520 * f, t, 0.06);
-      charge.nlp.frequency.setTargetAtTime(180 + 900 * f, t, 0.06);
-      charge.g.gain.setTargetAtTime(0.12 + 0.2 * f, t, 0.06);
-    },
-    chargeStop() {
-      if (!charge) return;
-      const t = ctx.currentTime, c = charge; charge = null;
-      c.g.gain.cancelScheduledValues(t); c.g.gain.setTargetAtTime(0.0001, t, 0.04);
-      c.o.stop(t + 0.2); c.src.stop(t + 0.2);
-    },
     // Q 점프: 몸이 솟구치는 묵직한 바람
     qJump() { if (!ready()) return; air({ f0: 180, fm: 700, f1: 400, dur: 0.3, peak: 1.44, a: 0.03 }); body({ f0: 70, f1: 110, dur: 0.2, peak: 0.4 }); },
     // Q 찍기: 낮은 쿵 + 흙 파편 + 잔향
@@ -535,7 +508,6 @@ function startQ() {
   if (P.cd.Q > 0 || P.qHold || P.qWind || P.dWind) return deny('Q');
   faceMouse();
   P.qHold = { t: 0, dir: P.face };
-  SFX.chargeStart();
 }
 function releaseQ() {
   if (!P.qHold) return;
@@ -543,7 +515,7 @@ function releaseQ() {
   P.qHold = null;
   P.qWind = { t: 0, f, dir };
   P.cd.Q = cdOf('Q');
-  SFX.chargeStop(); SFX.qJump();
+  SFX.qJump();
   P.moveT = null;
 }
 function slam(f, dir) {
@@ -1446,7 +1418,6 @@ for (const s of SK) { const el = bar.querySelector(`[data-k="${s.k}"]`); skEl[s.
   el.addEventListener('mouseenter', () => showTip(s.k)); el.addEventListener('mouseleave', hideTip); }
 
 function updateHud() {
-  if (P.qHold) SFX.chargeUpdate(qFrac());
   updatePops();
   for (const s of SK) {
     const e = skEl[s.k], cd = P.cd[s.k], max = CFG[s.k].cd;
@@ -1625,7 +1596,6 @@ function demoStep(i, sub, title) {
   demoSteps.innerHTML = st.map((s, k) => `<li class="${k === i ? 'on' : k < i ? 'done' : ''}">${s}</li>`).join('');
 }
 function clearAction() {
-  SFX.chargeStop();
   P.qHold = null; P.qWind = null; P.qLand = 0; P.dash = null; P.dWind = null; P.dSwing = 0;
   P.chains = []; P.rT = 0; P.moveT = null; P.atkT = null; P.wBuff = 0; mouse.rDown = false;
   for (const k in P.cd) P.cd[k] = 0;
