@@ -11,6 +11,10 @@
   .panel { position:fixed; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
   #ui { top:12px; left:12px; max-width:270px; }
   #ui h1 { font-size:14px; margin:0 0 2px; }
+  #ui .top { display:flex; align-items:baseline; gap:10px; margin:0 0 2px; }
+  #ui .top h1 { margin:0; }
+  .back { color:var(--mute); text-decoration:none; font-size:12px; white-space:nowrap; }
+  .back:hover { color:var(--fg); }
   #ui .sub { color:var(--mute); font-size:12px; margin-bottom:10px; }
   .row { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; }
   button { background:#232830; color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:5px 9px; font:inherit; cursor:pointer; }
@@ -43,7 +47,7 @@
 <div id="labels"></div>
 <div id="cross"></div>
 <div id="ui" class="panel">
-  <h1>그레이박스 3D 미리보기</h1>
+  <div class="top"><a class="back" href="../">← 아카이브</a><h1>그레이박스 3D 미리보기</h1></div>
   <div class="row">
     <button class="play" id="playAtk">▶ 공격 스폰에서 플레이</button>
     <button class="play" id="playDef">▶ 수비 스폰</button>

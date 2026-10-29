@@ -271,6 +271,8 @@
   .titlescreen{position:absolute;inset:0;z-index:250;display:flex;flex-direction:column;align-items:center;justify-content:center;
     background:radial-gradient(ellipse 55% 60% at 50% 50%, rgba(8,5,3,.35), rgba(8,5,3,.82) 80%)}
   .titlescreen[hidden]{display:none}
+  .titlescreen .back{position:absolute;top:24px;left:32px;color:var(--ivory-dim);text-decoration:none;font-size:13px;letter-spacing:.02em}
+  .titlescreen .back:hover{color:var(--ivory)}
   .titlescreen .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.42em;color:var(--brass);margin-bottom:10px}
   .titlescreen h1{margin:0;font-family:"Gowun Batang","Batang",serif;font-weight:700;font-size:84px;line-height:1;color:var(--ivory);
     letter-spacing:.01em;text-shadow:0 4px 0 #120b06,0 0 40px rgba(255,190,110,.25)}
@@ -422,6 +424,7 @@
 
       <!-- 시작 화면 -->
       <div class="titlescreen" id="title">
+        <a class="back" href="../">← 아카이브</a>
         <div class="eyebrow">TABLETOP WARGAME</div>
         <h1>Project Mio</h1>
         <div class="flourish"><i></i><b></b><i></i></div>
