@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>김셜티 아카이브</title>
+<title>프로토타입 아카이브</title>
 <meta name="description" content="게임 기획자 지망생 김셜티의 프로토타입 모음">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
@@ -15,13 +15,34 @@
     --fg: #e9ebef;
     --mute: #8d94a0;
     --acc: #f2c14e;
+    --tag-bg: #232833;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f5f1;
+    --card: #ffffff;
+    --card-hover: #fffdf6;
+    --line: #e2dfd6;
+    --fg: #1d2027;
+    --mute: #6b707a;
+    --acc: #b8860b;
+    --tag-bg: #efece4;
+    color-scheme: light;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); transition: background .2s, color .2s; }
   body {
     font: 15px/1.6 "Pretendard", -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
     min-height: 100vh;
   }
+  .theme-btn {
+    position: fixed; top: 16px; right: 16px; z-index: 10;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--card); color: var(--fg); border: 1px solid var(--line); border-radius: 999px;
+    padding: 7px 14px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .theme-btn:hover { border-color: var(--acc); }
+  .theme-btn:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
   .wrap { max-width: 960px; margin: 0 auto; padding: 72px 20px 56px; }
 
   header { margin-bottom: 48px; }
@@ -42,7 +63,7 @@
   .card h2 { font-size: 20px; margin: 6px 0 8px; letter-spacing: -.01em; }
   .card p { color: var(--mute); margin: 0 0 18px; flex: 1; }
   .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
-  .tag { font-size: 12px; color: var(--fg); background: #232833; border-radius: 999px; padding: 3px 10px; }
+  .tag { font-size: 12px; color: var(--fg); background: var(--tag-bg); border-radius: 999px; padding: 3px 10px; }
   .go { color: var(--acc); font-weight: 600; font-size: 14px; }
   .go::after { content: " →"; }
 
@@ -51,10 +72,11 @@
 </style>
 </head>
 <body>
+<button class="theme-btn" id="themeBtn" type="button" aria-label="화면 모드 전환"></button>
 <div class="wrap">
   <header>
-    <div class="eyebrow">Prototype Archive</div>
-    <h1>김셜티 아카이브</h1>
+    <div class="eyebrow">Shirty Kim</div>
+    <h1>프로토타입 아카이브</h1>
     <p class="intro">기획한 내용을 직접 만져 볼 수 있게 만든 프로토타입 모음이다. 카드를 누르면 바로 플레이할 수 있다.</p>
   </header>
 
@@ -80,5 +102,22 @@
     <a href="https://github.com/ShirtyKim/Archive">GitHub</a>
   </footer>
 </div>
+<script>
+  (function () {
+    var root = document.documentElement, btn = document.getElementById('themeBtn');
+    function apply(t) {
+      if (t === 'light') root.setAttribute('data-theme', 'light'); else root.removeAttribute('data-theme');
+      btn.textContent = t === 'light' ? '🌙 다크 모드' : '☀️ 라이트 모드';
+    }
+    var saved = 'dark';
+    try { saved = localStorage.getItem('archive-theme') || 'dark'; } catch (e) {}
+    apply(saved);
+    btn.addEventListener('click', function () {
+      var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      apply(next);
+      try { localStorage.setItem('archive-theme', next); } catch (e) {}
+    });
+  })();
+</script>
 </body>
 </html>
