@@ -431,7 +431,7 @@ const SFX = (() => {
       const t = ctx.currentTime, src = ctx.createBufferSource(), lp = ctx.createBiquadFilter(), o = ctx.createOscillator(), og = ctx.createGain(), g = ctx.createGain();
       src.buffer = noiseBuf; src.loop = true; lp.type = 'lowpass'; lp.frequency.value = 160; lp.Q.value = 1;
       o.type = 'sine'; o.frequency.value = 48; og.gain.value = 0.6;
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.03, t + 0.15);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.045, t + 0.15);
       src.connect(lp); lp.connect(g); o.connect(og); og.connect(g); g.connect(master);
       src.start(t, Math.random()); o.start(t);
       charge = { src, lp, o, g };
@@ -441,10 +441,8 @@ const SFX = (() => {
       const t = ctx.currentTime;
       charge.lp.frequency.setTargetAtTime(160 + 340 * f, t, 0.08);
       charge.o.frequency.setTargetAtTime(48 + 16 * f, t, 0.08);
-      charge.g.gain.setTargetAtTime(0.03 + 0.045 * f, t, 0.08);
+      charge.g.gain.setTargetAtTime(0.045 + 0.065 * f, t, 0.08);
     },
-    // 최대 차지 도달: 낮게 한 번 '둥'
-    chargeFull() { if (!ready()) return; body({ f0: 95, f1: 62, dur: 0.3, peak: 0.55, a: 0.01, rev: 0.25, sat: false }); air({ filter: 'lowpass', f0: 600, f1: 200, dur: 0.2, peak: 0.35, a: 0.005, rev: 0.2 }); },
     chargeStop() {
       if (!charge) return;
       const t = ctx.currentTime, c = charge; charge = null;
@@ -473,13 +471,14 @@ const SFX = (() => {
       air({ f0: 2200, f1: 700, q: 1, t: 0.03, dur: 0.35, peak: 0.312 * k, rev: 0.3 });
       air({ filter: 'lowpass', f0: 400, f1: 80, t: 0.1, dur: 0.9, peak: 0.438 * k, a: 0.05, rev: 0.4 });
     },
-    // W: 힘이 몸 안에서 끓어오르다 터진다 — 낮게 차오르는 울림 + 쿵
+    // W: 묵직하게 차오르는 울림 위에, 부드러운 상승음을 얹는다 (이전 밝은 소리와 묵직한 소리의 중간)
     w() {
       if (!ready()) return;
-      air({ filter: 'lowpass', f0: 120, f1: 1100, q: 3, dur: 0.32, peak: 0.27, a: 0.25, sat: true, rev: 0.2 });
-      body({ f0: 50, f1: 95, dur: 0.32, peak: 0.158, a: 0.25 });
-      body({ f0: 110, f1: 45, t: 0.3, dur: 0.4, peak: 0.338, rev: 0.35 });
-      air({ filter: 'lowpass', f0: 1800, f1: 200, t: 0.3, dur: 0.35, peak: 0.203, a: 0.003, sat: true, rev: 0.35 });
+      air({ filter: 'lowpass', f0: 140, f1: 1300, q: 3, dur: 0.3, peak: 0.2, a: 0.22, sat: true, rev: 0.2 });
+      body({ f0: 55, f1: 110, dur: 0.3, peak: 0.12, a: 0.22 });
+      [[440, 0], [659, 0.07], [880, 0.14]].forEach(([fq, t]) => body({ f0: fq, f1: fq * 1.01, t, dur: 0.3, peak: 0.11, a: 0.01, rev: 0.35, sat: false }));
+      air({ filter: 'highpass', f0: 4500, f1: 7000, t: 0.12, dur: 0.3, peak: 0.07, a: 0.02, rev: 0.3 });
+      body({ f0: 120, f1: 55, t: 0.26, dur: 0.32, peak: 0.24, rev: 0.3 });
     },
     // E: 바람이 갈라지는 소리 — 앞을 가르는 쉭 + 뒤로 찢어지는 바람 + 몸통의 낮은 무게
     e() {
@@ -489,13 +488,13 @@ const SFX = (() => {
       air({ filter: 'lowpass', f0: 500, f1: 120, dur: 0.35, peak: 0.6, a: 0.02, sat: true, rev: 0.2 });
       body({ f0: 90, f1: 55, dur: 0.22, peak: 0.3 });
     },
-    // F: 빛이 번쩍! — 날카로운 섬광 + 빛이 퍼지는 지글거림 + 공기가 밀리는 낮은 쿵
+    // F: 돌진 소리를 높은 음으로 — 같은 바람 결을 더 짧고 날카롭게
     f() {
       if (!ready()) return;
-      air({ filter: 'highpass', f0: 5000, f1: 3000, dur: 0.035, peak: 1.0, a: 0.001, rev: 0.4 });
-      air({ f0: 7000, f1: 2500, q: 1.2, t: 0.01, dur: 0.4, peak: 0.45, a: 0.005, am: 55, amDepth: 0.5, rev: 0.45 });
-      body({ f0: 160, f1: 50, dur: 0.35, peak: 0.6, rev: 0.3 });
-      air({ filter: 'lowpass', f0: 900, f1: 150, dur: 0.3, peak: 0.5, a: 0.002, sat: true });
+      air({ f0: 560, fm: 4200, f1: 950, q: 0.9, dur: 0.24, peak: 1.0, a: 0.012, rev: 0.3 });
+      air({ filter: 'highpass', f0: 4800, f1: 9500, dur: 0.12, peak: 0.35, a: 0.006, am: 70, amDepth: 0.6 });
+      air({ filter: 'lowpass', f0: 950, f1: 230, dur: 0.26, peak: 0.55, a: 0.012, sat: true, rev: 0.25 });
+      body({ f0: 170, f1: 105, dur: 0.16, peak: 0.28 });
     },
     // R 시전: 한 바퀴 도는 무거운 바람 + 쇠사슬이 풀려 나가는 덜컥임
     rCast() {
@@ -545,7 +544,7 @@ const SFX = (() => {
 function startQ() {
   if (P.cd.Q > 0 || P.qHold || P.qWind || P.dWind) return deny('Q');
   faceMouse();
-  P.qHold = { t: 0, dir: P.face, full: false };
+  P.qHold = { t: 0, dir: P.face };
   SFX.chargeStart();
 }
 function releaseQ() {
@@ -1458,7 +1457,7 @@ for (const s of SK) { const el = bar.querySelector(`[data-k="${s.k}"]`); skEl[s.
   el.addEventListener('mouseenter', () => showTip(s.k)); el.addEventListener('mouseleave', hideTip); }
 
 function updateHud() {
-  if (P.qHold) { const f = qFrac(); SFX.chargeUpdate(f); if (f >= 1 && !P.qHold.full) { P.qHold.full = true; SFX.chargeFull(); } }
+  if (P.qHold) SFX.chargeUpdate(qFrac());
   updatePops();
   for (const s of SK) {
     const e = skEl[s.k], cd = P.cd[s.k], max = CFG[s.k].cd;
