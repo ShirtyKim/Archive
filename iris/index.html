@@ -355,7 +355,7 @@ function faceMouse() { P.face = Math.atan2(mouse.y - P.y, mouse.x - P.x); }
    사운드 — 코드로 합성한다 (Web Audio). 파일 없이 동작한다
    ========================================================= */
 const SFX = (() => {
-  let ctx = null, master = null, noiseBuf = null, revIn = null, drive = null;
+  let ctx = null, master = null, noiseBuf = null, charge = null, revIn = null, drive = null;
   let on = true, vol = 0.6;
   try { on = localStorage.getItem('iris.sound') !== '0'; const v = parseFloat(localStorage.getItem('iris.vol')); if (!isNaN(v)) vol = v; } catch (e) {}
   function ensure() {
@@ -422,9 +422,47 @@ const SFX = (() => {
   return {
     unlock() { if (on) ensure(); },
     isOn: () => on, getVol: () => vol,
-    setOn(v) { on = v; if (master) master.gain.value = on ? vol : 0; try { localStorage.setItem('iris.sound', on ? '1' : '0'); } catch (e) {} },
+    setOn(v) { on = v; if (master) master.gain.value = on ? vol : 0; if (!on) this.chargeStop(); try { localStorage.setItem('iris.sound', on ? '1' : '0'); } catch (e) {} },
     setVol(v) { vol = v; if (master && on) master.gain.value = vol; try { localStorage.setItem('iris.vol', String(v)); } catch (e) {} },
 
+    // Q 차징: 아주 작은 낮은 긴장음 — 차지할수록 살짝 올라온다 (주의를 끌지 않을 정도로)
+    chargeStart() {
+      if (!ready() || charge) return;
+      const t = ctx.currentTime, src = ctx.createBufferSource(), lp = ctx.createBiquadFilter(), o = ctx.createOscillator(), og = ctx.createGain(), g = ctx.createGain();
+      src.buffer = noiseBuf; src.loop = true; lp.type = 'lowpass'; lp.frequency.value = 160; lp.Q.value = 1;
+      o.type = 'sine'; o.frequency.value = 48; og.gain.value = 0.6;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.03, t + 0.15);
+      src.connect(lp); lp.connect(g); o.connect(og); og.connect(g); g.connect(master);
+      src.start(t, Math.random()); o.start(t);
+      charge = { src, lp, o, g };
+    },
+    chargeUpdate(f) {
+      if (!charge) return;
+      const t = ctx.currentTime;
+      charge.lp.frequency.setTargetAtTime(160 + 340 * f, t, 0.08);
+      charge.o.frequency.setTargetAtTime(48 + 16 * f, t, 0.08);
+      charge.g.gain.setTargetAtTime(0.03 + 0.045 * f, t, 0.08);
+    },
+    // 최대 차지 도달: 낮게 한 번 '둥'
+    chargeFull() { if (!ready()) return; body({ f0: 95, f1: 62, dur: 0.3, peak: 0.55, a: 0.01, rev: 0.25, sat: false }); air({ filter: 'lowpass', f0: 600, f1: 200, dur: 0.2, peak: 0.35, a: 0.005, rev: 0.2 }); },
+    chargeStop() {
+      if (!charge) return;
+      const t = ctx.currentTime, c = charge; charge = null;
+      c.g.gain.cancelScheduledValues(t); c.g.gain.setTargetAtTime(0.0001, t, 0.03);
+      c.src.stop(t + 0.15); c.o.stop(t + 0.15);
+    },
+    // 평타: 아주 작은 방망이 바람 + 가벼운 타격 / 강화 평타: 묵직한 타격
+    atk(enh) {
+      if (!ready()) return;
+      if (!enh) {
+        air({ f0: 900, f1: 300, q: 0.8, dur: 0.12, peak: 0.16, a: 0.005, rev: 0.05 });
+        body({ f0: 150, f1: 85, t: 0.03, dur: 0.08, peak: 0.12, rev: 0.05, sat: false });
+      } else {
+        air({ f0: 1300, fm: 700, f1: 250, q: 0.7, dur: 0.18, peak: 0.5, a: 0.005, rev: 0.2 });
+        body({ f0: 180, f1: 45, t: 0.03, dur: 0.32, peak: 0.75, rev: 0.3 });
+        air({ filter: 'lowpass', f0: 2400, f1: 300, t: 0.03, dur: 0.15, peak: 0.55, a: 0.002, sat: true, rev: 0.25 });
+      }
+    },
     // Q 점프: 몸이 솟구치는 묵직한 바람
     qJump() { if (!ready()) return; air({ f0: 180, fm: 700, f1: 400, dur: 0.3, peak: 1.44, a: 0.03 }); body({ f0: 70, f1: 110, dur: 0.2, peak: 0.4 }); },
     // Q 찍기: 낮은 쿵 + 흙 파편 + 잔향
@@ -507,7 +545,8 @@ const SFX = (() => {
 function startQ() {
   if (P.cd.Q > 0 || P.qHold || P.qWind || P.dWind) return deny('Q');
   faceMouse();
-  P.qHold = { t: 0, dir: P.face };
+  P.qHold = { t: 0, dir: P.face, full: false };
+  SFX.chargeStart();
 }
 function releaseQ() {
   if (!P.qHold) return;
@@ -515,7 +554,7 @@ function releaseQ() {
   P.qHold = null;
   P.qWind = { t: 0, f, dir };
   P.cd.Q = cdOf('Q');
-  SFX.qJump();
+  SFX.chargeStop(); SFX.qJump();
   P.moveT = null;
 }
 function slam(f, dir) {
@@ -679,6 +718,7 @@ function basicAttack(d) {
   const enh = P.cd.T <= 0;
   if (enh) { amt += CFG.T.base + CFG.T.adRatio * ad(); P.cd.T = cdOf('T'); }
   P.swingEnh = enh;
+  SFX.atk(enh);
   hit(d, amt, enh ? '#ff7a4d' : '#e8eaef');
   addFx({ type: 'arc', x: P.x, y: P.y, ang: P.face, r: CFG.iris.range, spread: 1.2, color: enh ? 0xff6e3c : 0xe6e6f0, dur: 0.18 });
   if (enh) addTxt(d.x, d.y, '강화 평타', '#ff7a4d', 12, 0.7, 3.1);
@@ -1418,6 +1458,7 @@ for (const s of SK) { const el = bar.querySelector(`[data-k="${s.k}"]`); skEl[s.
   el.addEventListener('mouseenter', () => showTip(s.k)); el.addEventListener('mouseleave', hideTip); }
 
 function updateHud() {
+  if (P.qHold) { const f = qFrac(); SFX.chargeUpdate(f); if (f >= 1 && !P.qHold.full) { P.qHold.full = true; SFX.chargeFull(); } }
   updatePops();
   for (const s of SK) {
     const e = skEl[s.k], cd = P.cd[s.k], max = CFG[s.k].cd;
@@ -1596,6 +1637,7 @@ function demoStep(i, sub, title) {
   demoSteps.innerHTML = st.map((s, k) => `<li class="${k === i ? 'on' : k < i ? 'done' : ''}">${s}</li>`).join('');
 }
 function clearAction() {
+  SFX.chargeStop();
   P.qHold = null; P.qWind = null; P.qLand = 0; P.dash = null; P.dWind = null; P.dSwing = 0;
   P.chains = []; P.rT = 0; P.moveT = null; P.atkT = null; P.wBuff = 0; mouse.rDown = false;
   for (const k in P.cd) P.cd[k] = 0;
