@@ -355,7 +355,7 @@ function faceMouse() { P.face = Math.atan2(mouse.y - P.y, mouse.x - P.x); }
    사운드 — 코드로 합성한다 (Web Audio). 파일 없이 동작한다
    ========================================================= */
 const SFX = (() => {
-  let ctx = null, master = null, noiseBuf = null, charge = null;
+  let ctx = null, master = null, noiseBuf = null, charge = null, revIn = null, drive = null;
   let on = true, vol = 0.6;
   try { on = localStorage.getItem('iris.sound') !== '0'; const v = parseFloat(localStorage.getItem('iris.vol')); if (!isNaN(v)) vol = v; } catch (e) {}
   function ensure() {
@@ -363,33 +363,61 @@ const SFX = (() => {
       const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
       ctx = new AC();
       master = ctx.createGain(); master.gain.value = on ? vol : 0;
-      const comp = ctx.createDynamicsCompressor(); master.connect(comp); comp.connect(ctx.destination);
-      noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
+      master.connect(comp); comp.connect(ctx.destination);
+      noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
       const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      // 짧은 잔향: 감쇠하는 잡음으로 공간감을 만든다
+      const ir = ctx.createBuffer(2, ctx.sampleRate * 1.1, ctx.sampleRate);
+      for (let c = 0; c < 2; c++) { const x = ir.getChannelData(c); for (let i = 0; i < x.length; i++) x[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / x.length, 3.2); }
+      const conv = ctx.createConvolver(); conv.buffer = ir;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3500;
+      revIn = ctx.createGain(); revIn.gain.value = 0.35; revIn.connect(conv); conv.connect(lp); lp.connect(master);
+      // 약한 포화: 소리에 무게와 거친 질감을 준다
+      drive = ctx.createWaveShaper(); const n = 1024, curve = new Float32Array(n);
+      for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; curve[i] = Math.tanh(2.2 * x) / Math.tanh(2.2); }
+      drive.curve = curve; drive.connect(master);
     }
     if (ctx.state === 'suspended') ctx.resume();
     return ctx;
   }
   const ready = () => on && ensure();
-  function gainEnv(t, a, peak, dur) {
+  function env(t, a, peak, dur) {
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + a);
     g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(a + 0.01, dur));
     return g;
   }
-  // 음: 주파수 f0 → f1 으로 미끄러진다
-  function tone({ type = 'sine', f0, f1 = f0, t = 0, dur = 0.2, peak = 0.3, a = 0.005 }) {
-    const st = ctx.currentTime + t, o = ctx.createOscillator(), g = gainEnv(st, a, peak, dur);
-    o.type = type; o.frequency.setValueAtTime(f0, st); o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), st + dur);
-    o.connect(g); g.connect(master); o.start(st); o.stop(st + dur + 0.05);
+  function out(node, t, dur, { rev = 0, sat = false }) {
+    node.connect(sat ? drive : master);
+    if (rev > 0) { const s = ctx.createGain(); s.gain.value = rev; node.connect(s); s.connect(revIn); }
   }
-  // 잡음: 필터 주파수 f0 → f1
-  function noise({ filter = 'bandpass', f0 = 1000, f1 = f0, q = 1, t = 0, dur = 0.2, peak = 0.3, a = 0.005 }) {
-    const st = ctx.currentTime + t, src = ctx.createBufferSource(), bq = ctx.createBiquadFilter(), g = gainEnv(st, a, peak, dur);
-    src.buffer = noiseBuf; src.loop = true;
-    bq.type = filter; bq.Q.value = q; bq.frequency.setValueAtTime(f0, st); bq.frequency.exponentialRampToValueAtTime(Math.max(20, f1), st + dur);
-    src.connect(bq); bq.connect(g); g.connect(master); src.start(st, Math.random() * 0.5); src.stop(st + dur + 0.05);
+  // 사인파 몸통 (서브 쿵, 낮은 울림): 주파수 f0 → f1
+  function body({ f0, f1 = f0, t = 0, dur = 0.3, peak = 0.5, a = 0.004, rev = 0.2, sat = true }) {
+    const st = ctx.currentTime + t, o = ctx.createOscillator(), g = env(st, a, peak, dur);
+    o.type = 'sine'; o.frequency.setValueAtTime(f0, st); o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), st + dur);
+    o.connect(g); out(g, st, dur, { rev, sat }); o.start(st); o.stop(st + dur + 0.05);
+  }
+  // 잡음 (바람, 파편, 금속): 필터 f0 → (fm) → f1, am = 떨림(사슬 덜컥임) 속도
+  function air({ filter = 'bandpass', f0 = 1000, fm = null, f1 = f0, q = 0.7, t = 0, dur = 0.3, peak = 0.5, a = 0.01, rev = 0.25, sat = false, am = 0, amDepth = 0.8 }) {
+    const st = ctx.currentTime + t, src = ctx.createBufferSource(), bq = ctx.createBiquadFilter(), g = env(st, a, peak, dur);
+    src.buffer = noiseBuf; src.loop = true; src.connect(bq);
+    bq.type = filter; bq.Q.value = q; bq.frequency.setValueAtTime(f0, st);
+    if (fm) { bq.frequency.exponentialRampToValueAtTime(fm, st + dur * 0.45); bq.frequency.exponentialRampToValueAtTime(Math.max(20, f1), st + dur); }
+    else bq.frequency.exponentialRampToValueAtTime(Math.max(20, f1), st + dur);
+    let last = bq;
+    if (am > 0) {
+      const amg = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+      amg.gain.value = 1 - amDepth / 2; lfo.type = 'square'; lfo.frequency.value = am; lg.gain.value = amDepth / 2;
+      lfo.connect(lg); lg.connect(amg.gain); bq.connect(amg); last = amg; lfo.start(st); lfo.stop(st + dur + 0.05);
+    }
+    last.connect(g); out(g, st, dur, { rev, sat });
+    src.start(st, Math.random()); src.stop(st + dur + 0.05);
+  }
+  // 금속 울림: 좁은 대역 잡음 여러 개를 겹친다 (사슬, 벽)
+  function metal({ freqs, t = 0, dur = 0.25, peak = 0.3, rev = 0.3 }) {
+    for (const f of freqs) air({ f0: f, f1: f * 0.97, q: 25, t, dur, peak: peak * 2.5, a: 0.002, rev });
   }
   return {
     unlock() { if (on) ensure(); },
@@ -397,89 +425,107 @@ const SFX = (() => {
     setOn(v) { on = v; if (master) master.gain.value = on ? vol : 0; if (!on) this.chargeStop(); try { localStorage.setItem('iris.sound', on ? '1' : '0'); } catch (e) {} },
     setVol(v) { vol = v; if (master && on) master.gain.value = vol; try { localStorage.setItem('iris.vol', String(v)); } catch (e) {} },
 
-    // Q: 땅에서 차징 — 낮게 웅웅거리다 차지할수록 올라간다
+    // Q 차징: 땅이 울리는 낮은 진동 — 차지할수록 커지고 거칠어진다
     chargeStart() {
       if (!ready() || charge) return;
-      const t = ctx.currentTime, o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
-      o1.type = 'sawtooth'; o2.type = 'square'; o1.frequency.value = 70; o2.frequency.value = 141;
-      lp.type = 'lowpass'; lp.frequency.value = 300; lp.Q.value = 6;
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.08);
-      o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(master); o1.start(t); o2.start(t);
-      charge = { o1, o2, lp, g };
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.value = 42; lp.type = 'lowpass'; lp.frequency.value = 140; lp.Q.value = 2;
+      const src = ctx.createBufferSource(), nlp = ctx.createBiquadFilter(), ng = ctx.createGain();
+      src.buffer = noiseBuf; src.loop = true; nlp.type = 'lowpass'; nlp.frequency.value = 180; ng.gain.value = 0.9;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.12);
+      o.connect(lp); src.connect(nlp); nlp.connect(ng); ng.connect(lp); lp.connect(g); g.connect(drive);
+      o.start(t); src.start(t);
+      charge = { o, src, lp, nlp, g };
     },
     chargeUpdate(f) {
       if (!charge) return;
-      const t = ctx.currentTime, wob = 1 + Math.sin(t * 30) * 0.02 * f;
-      charge.o1.frequency.setTargetAtTime((70 + 110 * f) * wob, t, 0.03);
-      charge.o2.frequency.setTargetAtTime((141 + 220 * f) * wob, t, 0.03);
-      charge.lp.frequency.setTargetAtTime(300 + 2200 * f, t, 0.05);
-      charge.g.gain.setTargetAtTime(0.05 + 0.07 * f, t, 0.05);
+      const t = ctx.currentTime;
+      charge.o.frequency.setTargetAtTime(42 + 30 * f, t, 0.05);
+      charge.lp.frequency.setTargetAtTime(140 + 520 * f, t, 0.06);
+      charge.nlp.frequency.setTargetAtTime(180 + 900 * f, t, 0.06);
+      charge.g.gain.setTargetAtTime(0.12 + 0.2 * f, t, 0.06);
     },
     chargeStop() {
       if (!charge) return;
       const t = ctx.currentTime, c = charge; charge = null;
-      c.g.gain.cancelScheduledValues(t); c.g.gain.setTargetAtTime(0.0001, t, 0.03);
-      c.o1.stop(t + 0.15); c.o2.stop(t + 0.15);
+      c.g.gain.cancelScheduledValues(t); c.g.gain.setTargetAtTime(0.0001, t, 0.04);
+      c.o.stop(t + 0.2); c.src.stop(t + 0.2);
     },
-    // Q: 놓는 순간 뛰어오른다
-    qJump() { if (!ready()) return; noise({ f0: 350, f1: 1900, q: 0.6, dur: 0.24, peak: 1.0, a: 0.02 }); tone({ f0: 120, f1: 240, dur: 0.18, peak: 0.12 }); },
-    // Q: 내리찍기 — 낮은 쿵 + 흙 파편
+    // Q 점프: 몸이 솟구치는 묵직한 바람
+    qJump() { if (!ready()) return; air({ f0: 180, fm: 700, f1: 400, dur: 0.3, peak: 1.44, a: 0.03 }); body({ f0: 70, f1: 110, dur: 0.2, peak: 0.4 }); },
+    // Q 찍기: 낮은 쿵 + 흙 파편 + 잔향
     qSlam(f) {
       if (!ready()) return; const k = 0.7 + 0.3 * f;
-      tone({ f0: 150, f1: 38, dur: 0.5, peak: 0.95 * k });
-      tone({ type: 'triangle', f0: 75, f1: 32, dur: 0.6, peak: 0.45 * k });
-      noise({ filter: 'lowpass', f0: 1400, f1: 180, q: 0.7, dur: 0.4, peak: 0.7 * k });
-      noise({ f0: 2600, f1: 900, q: 1.5, t: 0.03, dur: 0.25, peak: 0.18 * k });
+      body({ f0: 140, f1: 34, dur: 0.6, peak: 1.25 * k, rev: 0.3 });
+      air({ filter: 'lowpass', f0: 1500, f1: 160, q: 0.7, dur: 0.45, peak: 1.125 * k, a: 0.003, sat: true, rev: 0.35 });
+      air({ f0: 2200, f1: 700, q: 1, t: 0.03, dur: 0.35, peak: 0.312 * k, rev: 0.3 });
+      air({ filter: 'lowpass', f0: 400, f1: 80, t: 0.1, dur: 0.9, peak: 0.438 * k, a: 0.05, rev: 0.4 });
     },
-    // W: 힘이 차오르는 상승음
+    // W: 힘이 몸 안에서 끓어오르다 터진다 — 낮게 차오르는 울림 + 쿵
     w() {
       if (!ready()) return;
-      [[440, 0], [659, 0.06], [880, 0.12]].forEach(([f, t]) => tone({ type: 'triangle', f0: f, f1: f * 1.02, t, dur: 0.22, peak: 0.18 }));
-      tone({ type: 'sawtooth', f0: 110, f1: 330, dur: 0.3, peak: 0.08, a: 0.04 });
-      noise({ filter: 'highpass', f0: 5000, f1: 7000, t: 0.08, dur: 0.3, peak: 0.06 });
+      air({ filter: 'lowpass', f0: 120, f1: 1100, q: 3, dur: 0.32, peak: 0.27, a: 0.25, sat: true, rev: 0.2 });
+      body({ f0: 50, f1: 95, dur: 0.32, peak: 0.158, a: 0.25 });
+      body({ f0: 110, f1: 45, t: 0.3, dur: 0.4, peak: 0.338, rev: 0.35 });
+      air({ filter: 'lowpass', f0: 1800, f1: 200, t: 0.3, dur: 0.35, peak: 0.203, a: 0.003, sat: true, rev: 0.35 });
     },
-    // E: 짧은 돌진 바람
-    e() { if (!ready()) return; noise({ f0: 500, f1: 2600, q: 0.6, dur: 0.2, peak: 1.0 }); tone({ f0: 220, f1: 110, dur: 0.14, peak: 0.15 }); },
-    // F: 점멸
+    // E: 바람이 갈라지는 소리 — 앞을 가르는 쉭 + 뒤로 찢어지는 바람 + 몸통의 낮은 무게
+    e() {
+      if (!ready()) return;
+      air({ f0: 300, fm: 2200, f1: 500, q: 0.9, dur: 0.32, peak: 1.0, a: 0.02, rev: 0.25 });
+      air({ filter: 'highpass', f0: 2500, f1: 5500, dur: 0.16, peak: 0.35, a: 0.01, am: 38, amDepth: 0.6 });
+      air({ filter: 'lowpass', f0: 500, f1: 120, dur: 0.35, peak: 0.6, a: 0.02, sat: true, rev: 0.2 });
+      body({ f0: 90, f1: 55, dur: 0.22, peak: 0.3 });
+    },
+    // F: 빛이 번쩍! — 날카로운 섬광 + 빛이 퍼지는 지글거림 + 공기가 밀리는 낮은 쿵
     f() {
       if (!ready()) return;
-      tone({ f0: 300, f1: 2600, dur: 0.14, peak: 0.22 });
-      tone({ f0: 2400, f1: 2300, t: 0.12, dur: 0.3, peak: 0.07 });
-      noise({ filter: 'highpass', f0: 6000, f1: 9000, dur: 0.16, peak: 0.08 });
+      air({ filter: 'highpass', f0: 5000, f1: 3000, dur: 0.035, peak: 1.0, a: 0.001, rev: 0.4 });
+      air({ f0: 7000, f1: 2500, q: 1.2, t: 0.01, dur: 0.4, peak: 0.45, a: 0.005, am: 55, amDepth: 0.5, rev: 0.45 });
+      body({ f0: 160, f1: 50, dur: 0.35, peak: 0.6, rev: 0.3 });
+      air({ filter: 'lowpass', f0: 900, f1: 150, dur: 0.3, peak: 0.5, a: 0.002, sat: true });
     },
-    // R: 한 바퀴 돌며 사슬을 던진다 — 금속 짤랑임 + 회전 바람
+    // R 시전: 한 바퀴 도는 무거운 바람 + 쇠사슬이 풀려 나가는 덜컥임
     rCast() {
       if (!ready()) return;
-      noise({ f0: 280, f1: 1100, q: 0.6, dur: 0.45, peak: 0.7, a: 0.08 });
-      for (let i = 0; i < 8; i++) {
-        noise({ f0: 2800 + Math.random() * 2600, q: 9, t: 0.05 + i * 0.045, dur: 0.05, peak: 0.28 });
-        tone({ type: 'square', f0: 1300 + Math.random() * 500, f1: 900, t: 0.05 + i * 0.045, dur: 0.035, peak: 0.035 });
-      }
+      air({ f0: 160, fm: 650, f1: 220, q: 0.8, dur: 0.5, peak: 0.595, a: 0.06, rev: 0.25 });
+      air({ f0: 1500, f1: 900, q: 3, t: 0.12, dur: 0.4, peak: 0.42, am: 24, amDepth: 0.9, rev: 0.3 });
+      for (let i = 0; i < 4; i++) metal({ freqs: [1150 + i * 90, 1780 + i * 60], t: 0.14 + i * 0.08, dur: 0.15, peak: 0.084 });
+      body({ f0: 100, f1: 50, t: 0.45, dur: 0.3, peak: 0.315, rev: 0.3 });
     },
-    // R: 손을 뻗어 끌어당긴다 — 사슬이 감기는 소리 + 쿵
+    // R 당기기: 쇠사슬이 팽팽하게 감기며 끌려온다 + 도착 쿵
     rPull() {
       if (!ready()) return;
-      noise({ f0: 3200, f1: 700, q: 4, dur: 0.3, peak: 0.3 });
-      tone({ type: 'sawtooth', f0: 900, f1: 160, dur: 0.3, peak: 0.1 });
-      tone({ f0: 95, f1: 45, t: 0.27, dur: 0.22, peak: 0.55 });
+      air({ f0: 1700, f1: 600, q: 2.5, dur: 0.32, peak: 0.51, a: 0.01, am: 30, amDepth: 0.9, rev: 0.25 });
+      air({ filter: 'lowpass', f0: 300, f1: 900, q: 4, dur: 0.3, peak: 0.3, a: 0.04, sat: true });
+      body({ f0: 120, f1: 38, t: 0.28, dur: 0.45, peak: 0.57, rev: 0.35 });
+      air({ filter: 'lowpass', f0: 1300, f1: 150, t: 0.28, dur: 0.35, peak: 0.42, a: 0.003, sat: true, rev: 0.35 });
     },
-    // R: 사슬이 끊긴다 / 벽에 걸린다
-    snap() { if (!ready()) return; noise({ filter: 'highpass', f0: 3000, f1: 2000, dur: 0.07, peak: 0.4 }); tone({ type: 'square', f0: 1800, f1: 500, dur: 0.09, peak: 0.08 }); },
-    // D: 선딜 — 방망이를 뒤로 끌어당기는 소리
-    dWind() { if (!ready()) return; noise({ f0: 180, f1: 600, q: 0.6, dur: 0.38, peak: 0.7, a: 0.12 }); },
-    // D: 휘두르기 (+적중 시 타격음)
+    // 사슬 끊김 / 벽에 걸림: 둔탁하게 끊기는 쇳소리
+    snap() {
+      if (!ready()) return;
+      metal({ freqs: [980, 1530], dur: 0.2, peak: 0.16 });
+      air({ filter: 'highpass', f0: 2000, f1: 1200, dur: 0.06, peak: 0.6, a: 0.001 });
+      body({ f0: 130, f1: 60, dur: 0.18, peak: 0.45 });
+    },
+    // D 선딜: 방망이를 뒤로 크게 끌어당긴다
+    dWind() { if (!ready()) return; air({ filter: 'lowpass', f0: 150, f1: 700, q: 2, dur: 0.38, peak: 0.6, a: 0.25, sat: true }); },
+    // D 휘두르기 (+적중 시 둔탁한 타격)
     dSwing(hits) {
       if (!ready()) return;
-      noise({ f0: 1700, f1: 380, q: 0.7, dur: 0.2, peak: 0.9 });
-      if (hits) { tone({ f0: 240, f1: 85, t: 0.03, dur: 0.16, peak: 0.65 }); noise({ filter: 'lowpass', f0: 2400, f1: 600, t: 0.03, dur: 0.09, peak: 0.55 }); }
+      air({ f0: 1200, fm: 600, f1: 220, q: 0.8, dur: 0.24, peak: 1.0, a: 0.01, rev: 0.2 });
+      if (hits) {
+        body({ f0: 170, f1: 48, t: 0.04, dur: 0.3, peak: 1.0, rev: 0.3 });
+        air({ filter: 'lowpass', f0: 2200, f1: 250, t: 0.04, dur: 0.18, peak: 0.85, a: 0.002, sat: true, rev: 0.3 });
+      }
     },
-    // D: 벽꿍
+    // D 벽꿍: 무거운 충돌 + 벽의 금속성 울림
     clank() {
       if (!ready()) return;
-      tone({ type: 'square', f0: 520, f1: 500, dur: 0.22, peak: 0.1 });
-      tone({ type: 'square', f0: 787, f1: 760, dur: 0.18, peak: 0.07 });
-      noise({ f0: 2500, f1: 1200, q: 2, dur: 0.12, peak: 0.35 });
-      tone({ f0: 120, f1: 60, dur: 0.15, peak: 0.4 });
+      body({ f0: 110, f1: 36, dur: 0.5, peak: 1.0, rev: 0.4 });
+      air({ filter: 'lowpass', f0: 1600, f1: 120, dur: 0.4, peak: 0.9, a: 0.002, sat: true, rev: 0.4 });
+      metal({ freqs: [420, 690, 1040], t: 0.01, dur: 0.45, peak: 0.1 });
     }
   };
 })();
