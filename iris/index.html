@@ -96,6 +96,9 @@
       font-weight:900;font-size:15px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.5);
 }
   .keypop i small{font-size:11px;margin-left:4px;font-weight:700}
+  .sound{display:flex;align-items:center;gap:8px;margin-top:8px}
+  .sound input{flex:1;accent-color:var(--acc)}
+  .sound span{font-size:12px;color:var(--sub);width:34px;text-align:right}
   .combos{display:flex;flex-direction:column;gap:6px}
   .cmb{border:1px solid #343b4a;border-radius:8px;padding:8px 10px;cursor:pointer;background:var(--panel2);font-size:12.5px;color:#cdd2db}
   .cmb:hover{border-color:#5a6478}
@@ -179,6 +182,7 @@
         <b>Q / E / D / F</b><span>커서 방향으로 사용한다</span>
         <b>S</b><span>멈춘다</span>
         <b>마우스 휠</b><span>카메라를 줌한다</span>
+        <b>M</b><span>소리를 끄고 켠다</span>
       </div>
     </div>
 
@@ -190,6 +194,7 @@
         <button id="optSpeed">속도 1x</button>
         <button id="optReset">허수아비 리셋</button>
       </div>
+      <div class="sound"><button id="optSound">소리 켜짐</button><input type="range" id="optVol" min="0" max="1" step="0.05" aria-label="볼륨"><span id="volTxt"></span></div>
     </div>
 
     <div class="card">
@@ -346,10 +351,145 @@ function respawn(d) {
 /* ---------- 스킬 ---------- */
 function faceMouse() { P.face = Math.atan2(mouse.y - P.y, mouse.x - P.x); }
 
+/* =========================================================
+   사운드 — 코드로 합성한다 (Web Audio). 파일 없이 동작한다
+   ========================================================= */
+const SFX = (() => {
+  let ctx = null, master = null, noiseBuf = null, charge = null;
+  let on = true, vol = 0.6;
+  try { on = localStorage.getItem('iris.sound') !== '0'; const v = parseFloat(localStorage.getItem('iris.vol')); if (!isNaN(v)) vol = v; } catch (e) {}
+  function ensure() {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
+      ctx = new AC();
+      master = ctx.createGain(); master.gain.value = on ? vol : 0;
+      const comp = ctx.createDynamicsCompressor(); master.connect(comp); comp.connect(ctx.destination);
+      noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  const ready = () => on && ensure();
+  function gainEnv(t, a, peak, dur) {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(a + 0.01, dur));
+    return g;
+  }
+  // 음: 주파수 f0 → f1 으로 미끄러진다
+  function tone({ type = 'sine', f0, f1 = f0, t = 0, dur = 0.2, peak = 0.3, a = 0.005 }) {
+    const st = ctx.currentTime + t, o = ctx.createOscillator(), g = gainEnv(st, a, peak, dur);
+    o.type = type; o.frequency.setValueAtTime(f0, st); o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), st + dur);
+    o.connect(g); g.connect(master); o.start(st); o.stop(st + dur + 0.05);
+  }
+  // 잡음: 필터 주파수 f0 → f1
+  function noise({ filter = 'bandpass', f0 = 1000, f1 = f0, q = 1, t = 0, dur = 0.2, peak = 0.3, a = 0.005 }) {
+    const st = ctx.currentTime + t, src = ctx.createBufferSource(), bq = ctx.createBiquadFilter(), g = gainEnv(st, a, peak, dur);
+    src.buffer = noiseBuf; src.loop = true;
+    bq.type = filter; bq.Q.value = q; bq.frequency.setValueAtTime(f0, st); bq.frequency.exponentialRampToValueAtTime(Math.max(20, f1), st + dur);
+    src.connect(bq); bq.connect(g); g.connect(master); src.start(st, Math.random() * 0.5); src.stop(st + dur + 0.05);
+  }
+  return {
+    unlock() { if (on) ensure(); },
+    isOn: () => on, getVol: () => vol,
+    setOn(v) { on = v; if (master) master.gain.value = on ? vol : 0; if (!on) this.chargeStop(); try { localStorage.setItem('iris.sound', on ? '1' : '0'); } catch (e) {} },
+    setVol(v) { vol = v; if (master && on) master.gain.value = vol; try { localStorage.setItem('iris.vol', String(v)); } catch (e) {} },
+
+    // Q: 땅에서 차징 — 낮게 웅웅거리다 차지할수록 올라간다
+    chargeStart() {
+      if (!ready() || charge) return;
+      const t = ctx.currentTime, o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+      o1.type = 'sawtooth'; o2.type = 'square'; o1.frequency.value = 70; o2.frequency.value = 141;
+      lp.type = 'lowpass'; lp.frequency.value = 300; lp.Q.value = 6;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.08);
+      o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(master); o1.start(t); o2.start(t);
+      charge = { o1, o2, lp, g };
+    },
+    chargeUpdate(f) {
+      if (!charge) return;
+      const t = ctx.currentTime, wob = 1 + Math.sin(t * 30) * 0.02 * f;
+      charge.o1.frequency.setTargetAtTime((70 + 110 * f) * wob, t, 0.03);
+      charge.o2.frequency.setTargetAtTime((141 + 220 * f) * wob, t, 0.03);
+      charge.lp.frequency.setTargetAtTime(300 + 2200 * f, t, 0.05);
+      charge.g.gain.setTargetAtTime(0.05 + 0.07 * f, t, 0.05);
+    },
+    chargeStop() {
+      if (!charge) return;
+      const t = ctx.currentTime, c = charge; charge = null;
+      c.g.gain.cancelScheduledValues(t); c.g.gain.setTargetAtTime(0.0001, t, 0.03);
+      c.o1.stop(t + 0.15); c.o2.stop(t + 0.15);
+    },
+    // Q: 놓는 순간 뛰어오른다
+    qJump() { if (!ready()) return; noise({ f0: 350, f1: 1900, q: 0.6, dur: 0.24, peak: 1.0, a: 0.02 }); tone({ f0: 120, f1: 240, dur: 0.18, peak: 0.12 }); },
+    // Q: 내리찍기 — 낮은 쿵 + 흙 파편
+    qSlam(f) {
+      if (!ready()) return; const k = 0.7 + 0.3 * f;
+      tone({ f0: 150, f1: 38, dur: 0.5, peak: 0.95 * k });
+      tone({ type: 'triangle', f0: 75, f1: 32, dur: 0.6, peak: 0.45 * k });
+      noise({ filter: 'lowpass', f0: 1400, f1: 180, q: 0.7, dur: 0.4, peak: 0.7 * k });
+      noise({ f0: 2600, f1: 900, q: 1.5, t: 0.03, dur: 0.25, peak: 0.18 * k });
+    },
+    // W: 힘이 차오르는 상승음
+    w() {
+      if (!ready()) return;
+      [[440, 0], [659, 0.06], [880, 0.12]].forEach(([f, t]) => tone({ type: 'triangle', f0: f, f1: f * 1.02, t, dur: 0.22, peak: 0.18 }));
+      tone({ type: 'sawtooth', f0: 110, f1: 330, dur: 0.3, peak: 0.08, a: 0.04 });
+      noise({ filter: 'highpass', f0: 5000, f1: 7000, t: 0.08, dur: 0.3, peak: 0.06 });
+    },
+    // E: 짧은 돌진 바람
+    e() { if (!ready()) return; noise({ f0: 500, f1: 2600, q: 0.6, dur: 0.2, peak: 1.0 }); tone({ f0: 220, f1: 110, dur: 0.14, peak: 0.15 }); },
+    // F: 점멸
+    f() {
+      if (!ready()) return;
+      tone({ f0: 300, f1: 2600, dur: 0.14, peak: 0.22 });
+      tone({ f0: 2400, f1: 2300, t: 0.12, dur: 0.3, peak: 0.07 });
+      noise({ filter: 'highpass', f0: 6000, f1: 9000, dur: 0.16, peak: 0.08 });
+    },
+    // R: 한 바퀴 돌며 사슬을 던진다 — 금속 짤랑임 + 회전 바람
+    rCast() {
+      if (!ready()) return;
+      noise({ f0: 280, f1: 1100, q: 0.6, dur: 0.45, peak: 0.7, a: 0.08 });
+      for (let i = 0; i < 8; i++) {
+        noise({ f0: 2800 + Math.random() * 2600, q: 9, t: 0.05 + i * 0.045, dur: 0.05, peak: 0.28 });
+        tone({ type: 'square', f0: 1300 + Math.random() * 500, f1: 900, t: 0.05 + i * 0.045, dur: 0.035, peak: 0.035 });
+      }
+    },
+    // R: 손을 뻗어 끌어당긴다 — 사슬이 감기는 소리 + 쿵
+    rPull() {
+      if (!ready()) return;
+      noise({ f0: 3200, f1: 700, q: 4, dur: 0.3, peak: 0.3 });
+      tone({ type: 'sawtooth', f0: 900, f1: 160, dur: 0.3, peak: 0.1 });
+      tone({ f0: 95, f1: 45, t: 0.27, dur: 0.22, peak: 0.55 });
+    },
+    // R: 사슬이 끊긴다 / 벽에 걸린다
+    snap() { if (!ready()) return; noise({ filter: 'highpass', f0: 3000, f1: 2000, dur: 0.07, peak: 0.4 }); tone({ type: 'square', f0: 1800, f1: 500, dur: 0.09, peak: 0.08 }); },
+    // D: 선딜 — 방망이를 뒤로 끌어당기는 소리
+    dWind() { if (!ready()) return; noise({ f0: 180, f1: 600, q: 0.6, dur: 0.38, peak: 0.7, a: 0.12 }); },
+    // D: 휘두르기 (+적중 시 타격음)
+    dSwing(hits) {
+      if (!ready()) return;
+      noise({ f0: 1700, f1: 380, q: 0.7, dur: 0.2, peak: 0.9 });
+      if (hits) { tone({ f0: 240, f1: 85, t: 0.03, dur: 0.16, peak: 0.65 }); noise({ filter: 'lowpass', f0: 2400, f1: 600, t: 0.03, dur: 0.09, peak: 0.55 }); }
+    },
+    // D: 벽꿍
+    clank() {
+      if (!ready()) return;
+      tone({ type: 'square', f0: 520, f1: 500, dur: 0.22, peak: 0.1 });
+      tone({ type: 'square', f0: 787, f1: 760, dur: 0.18, peak: 0.07 });
+      noise({ f0: 2500, f1: 1200, q: 2, dur: 0.12, peak: 0.35 });
+      tone({ f0: 120, f1: 60, dur: 0.15, peak: 0.4 });
+    }
+  };
+})();
+['pointerdown', 'keydown'].forEach(ev => window.addEventListener(ev, () => SFX.unlock(), { passive: true }));
+
 function startQ() {
   if (P.cd.Q > 0 || P.qHold || P.qWind || P.dWind) return deny('Q');
   faceMouse();
   P.qHold = { t: 0, dir: P.face };
+  SFX.chargeStart();
 }
 function releaseQ() {
   if (!P.qHold) return;
@@ -357,6 +497,7 @@ function releaseQ() {
   P.qHold = null;
   P.qWind = { t: 0, f, dir };
   P.cd.Q = cdOf('Q');
+  SFX.chargeStop(); SFX.qJump();
   P.moveT = null;
 }
 function slam(f, dir) {
@@ -379,6 +520,7 @@ function slam(f, dir) {
   addFx({ type: 'ring', x: P.x, y: P.y, r0: 0.2, r1: 1.2, color: 0xfff0d8, dur: 0.25 });
   P.qLand = 0.22;
   shake = 0.32;
+  SFX.qSlam(f);
   log(`<b>Q ${CFG.Q.name}</b> — 차지 ${Math.round(f * 100)}%, ${n}명 적중`);
 }
 
@@ -388,6 +530,7 @@ function useW() {
   const had = P.cd.Q > 0;
   P.cd.Q = 0;
   P.wBuff = CFG.W.dur;
+  SFX.w();
   addFx({ type: 'ring', x: P.x, y: P.y, r0: 0.3, r1: 1.6, color: 0xff6a3d, dur: 0.4, follow: true });
   addTxt(P.x, P.y, had ? 'Q 초기화!' : '버프', '#ff9b7a', 14, 0.9, 2.6);
   log(`<b>W ${CFG.W.name}</b> — Q 쿨타임 ${had ? '초기화' : '(이미 준비됨)'}, ${CFG.W.dur}초 버프`);
@@ -421,6 +564,7 @@ function useE() {
   P.face = Math.atan2(dy, dx);
   P.cd.E = cdOf('E');
   P.moveT = null;
+  SFX.e();
   addFx({ type: 'line', x1: P.x, y1: P.y, x2: end.x, y2: end.y, color: 0xff8c5a, dur: 0.35 });
   const during = P.qHold ? ' (Q 홀드 중)' : P.qWind ? ' (Q 내려찍기 중)' : '';
   log(`<b>E ${CFG.E.name}</b>${during}${end.crossed ? ' — 벽 넘기' : end.stopped ? ' — 벽이 두꺼워 앞에서 멈춤' : ''}`);
@@ -455,6 +599,7 @@ function useF() {
   addFx({ type: 'disc', x: P.x, y: P.y, r: 0.7, color: 0xfff27a, op: 0.45, dur: 0.25 });
   P.cd.F = cdOf('F');
   P.moveT = null;
+  SFX.f();
   const during = P.qHold ? ' (Q 홀드 중)' : P.qWind ? ' (Q 내려찍기 중)' : P.dWind ? ' (D 선딜 중)' : '';
   log(`<b>F ${CFG.F.name}</b>${during} — ${D.toFixed(1)}m 이동`);
 }
@@ -466,6 +611,7 @@ function useR() {
   P.chains = ts.map(t => ({ t }));
   P.rT = CFG.R.dur;
   P.rSpin = ANIM.rSpin;   // 한 바퀴 돌며 사슬을 던진다
+  SFX.rCast();
   addFx({ type: 'ring', x: P.x, y: P.y, r0: 0.5, r1: CFG.R.radius, color: 0xb47cff, dur: 0.45 });
   log(`<b>R ${CFG.R.name}</b> — ${ts.length}명 사슬 연결 (${ts.map(t => t.id).join(', ') || '없음'})`);
 }
@@ -475,6 +621,7 @@ function useD() {
   faceMouse();
   P.dWind = { t: 0, ang: P.face };
   P.cd.D = cdOf('D');
+  SFX.dWind();
   P.moveT = null;
 }
 function fullSwing(ang) {
@@ -492,6 +639,7 @@ function fullSwing(ang) {
     d.air = 0;
   }
   P.dSwing = 0.2;
+  SFX.dSwing(n);
   addFx({ type: 'arc', x: P.x, y: P.y, ang, r: CFG.D.range, spread: CFG.D.arc * Math.PI / 180, color: 0xa0ff8c, dur: 0.3 });
   log(`<b>D ${CFG.D.name}</b> — ${n}명 적중`);
 }
@@ -582,7 +730,7 @@ function updatePlayer(dt) {
       if (dist(P, c.t) > CFG.R.breakRange) {
         P.chains = P.chains.filter(x => x !== c);
         addTxt(c.t.x, c.t.y, '사슬 끊김', '#c9a6ff', 13, 0.9, 3);
-        log(`R 사슬 끊김 — ${c.t.id} (사거리 ${CFG.R.breakRange}m 이탈)`);
+        log(`R 사슬 끊김 — ${c.t.id} (사거리 ${CFG.R.breakRange}m 이탈)`); SFX.snap();
       }
     }
     if (P.rT <= 0) {
@@ -603,7 +751,7 @@ function updatePlayer(dt) {
         d.pull = { fx: d.x, fy: d.y, tx, ty, t: 0 }; d.px = d.x; d.py = d.y;
         d.kb = null;
       }
-      if (P.chains.length) P.rPull = ANIM.rPull;   // 손가락을 하늘로 뻗으며 끌어온다
+      if (P.chains.length) { P.rPull = ANIM.rPull; SFX.rPull(); }   // 손가락을 하늘로 뻗으며 끌어온다
       if (P.chains.length) log(`R 끌어당김 — ${P.chains.map(c => c.t.id).join(', ')} → Q 지점`);
       P.chains = [];
     }
@@ -643,7 +791,7 @@ function updateDummies(dt) {
         d.x = d.px; d.y = d.py; d.pull = null;
         addTxt(d.x, d.y, '벽에 걸림', '#c9a6ff', 13, 0.9, 3);
         addFx({ type: 'ring', x: d.x, y: d.y, r0: 0.3, r1: 1.0, color: 0xb47cff, dur: 0.3 });
-        log(`R 끌어당김 끊김 — ${d.id} 벽에 걸림`);
+        log(`R 끌어당김 끊김 — ${d.id} 벽에 걸림`); SFX.snap();
         hit(d, dmgOf(CFG.R.dmg), '#d8b8ff');
         continue;
       }
@@ -659,7 +807,7 @@ function updateDummies(dt) {
         addTxt(d.x, d.y, '벽꿍! 기절', '#9dff7a', 14, 0.9, 3);
         addFx({ type: 'ring', x: d.x, y: d.y, r0: 0.3, r1: 1.1, color: 0xa0ff8c, dur: 0.3 });
         shake = Math.max(shake, 0.12);
-        log(`D 벽 충돌 — ${d.id} ${CFG.D.stun}초 기절`);
+        log(`D 벽 충돌 — ${d.id} ${CFG.D.stun}초 기절`); SFX.clank();
       } else { d.x = nx; d.y = ny; d.kb.left -= s; if (d.kb.left <= 1e-3) d.kb = null; }
       continue;
     }
@@ -1252,6 +1400,7 @@ for (const s of SK) { const el = bar.querySelector(`[data-k="${s.k}"]`); skEl[s.
   el.addEventListener('mouseenter', () => showTip(s.k)); el.addEventListener('mouseleave', hideTip); }
 
 function updateHud() {
+  if (P.qHold) SFX.chargeUpdate(qFrac());
   updatePops();
   for (const s of SK) {
     const e = skEl[s.k], cd = P.cd[s.k], max = CFG[s.k].cd;
@@ -1370,6 +1519,7 @@ window.addEventListener('keydown', e => {
     case 'KeyR': if (!e.repeat) useR(); break;
     case 'KeyD': if (!e.repeat) useD(); break;
     case 'KeyF': if (!e.repeat) useF(); break;
+    case 'KeyM': SFX.setOn(!SFX.isOn()); syncSound(); break;
     case 'KeyS': P.moveT = null; P.atkT = null; mouse.rDown = false; break;
     default: return;
   }
@@ -1388,6 +1538,15 @@ document.getElementById('optSpeed').onclick = e => {
   opt.speed = opt.speed === 1 ? 0.5 : opt.speed === 0.5 ? 0.25 : 1;
   e.currentTarget.textContent = `속도 ${opt.speed}x`; e.currentTarget.classList.toggle('on', opt.speed !== 1);
 };
+const sndBtn = document.getElementById('optSound'), volIn = document.getElementById('optVol'), volTxt = document.getElementById('volTxt');
+function syncSound() {
+  sndBtn.textContent = SFX.isOn() ? '소리 켜짐' : '소리 꺼짐'; sndBtn.classList.toggle('on', !SFX.isOn());
+  volIn.value = SFX.getVol(); volTxt.textContent = Math.round(SFX.getVol() * 100) + '%'; volIn.disabled = !SFX.isOn();
+}
+sndBtn.onclick = () => { SFX.setOn(!SFX.isOn()); syncSound(); };
+let volPrev = 0;
+volIn.oninput = () => { SFX.setVol(parseFloat(volIn.value)); syncSound(); const n = performance.now(); if (n - volPrev > 150) { volPrev = n; SFX.e(); } };
+syncSound();
 document.getElementById('optReset').onclick = () => { if (DEMO.active) stopDemo(); dummies.forEach(respawn); P.chains = []; P.rT = 0; combo.dmg = 0; combo.hits = 0; log('허수아비 리셋'); };
 for (const b of document.querySelectorAll('button')) b.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'Enter') return; e.preventDefault(); });
 
@@ -1420,6 +1579,7 @@ function demoStep(i, sub, title) {
   demoSteps.innerHTML = st.map((s, k) => `<li class="${k === i ? 'on' : k < i ? 'done' : ''}">${s}</li>`).join('');
 }
 function clearAction() {
+  SFX.chargeStop();
   P.qHold = null; P.qWind = null; P.qLand = 0; P.dash = null; P.dWind = null; P.dSwing = 0;
   P.chains = []; P.rT = 0; P.moveT = null; P.atkT = null; P.wBuff = 0; mouse.rDown = false;
   for (const k in P.cd) P.cd[k] = 0;
