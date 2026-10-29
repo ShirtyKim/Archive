@@ -456,9 +456,9 @@ const SFX = (() => {
         air({ f0: 900, f1: 300, q: 0.8, dur: 0.12, peak: 0.16, a: 0.005, rev: 0.05 });
         body({ f0: 150, f1: 85, t: 0.03, dur: 0.08, peak: 0.12, rev: 0.05, sat: false });
       } else {
-        air({ f0: 1300, fm: 700, f1: 250, q: 0.7, dur: 0.18, peak: 0.5, a: 0.005, rev: 0.2 });
-        body({ f0: 180, f1: 45, t: 0.03, dur: 0.32, peak: 0.75, rev: 0.3 });
-        air({ filter: 'lowpass', f0: 2400, f1: 300, t: 0.03, dur: 0.15, peak: 0.55, a: 0.002, sat: true, rev: 0.25 });
+        air({ f0: 1100, fm: 600, f1: 220, q: 0.7, dur: 0.2, peak: 0.18, a: 0.01, rev: 0.12 });
+        body({ f0: 170, f1: 55, t: 0.1, dur: 0.22, peak: 0.22, rev: 0.15 });
+        air({ filter: 'lowpass', f0: 2000, f1: 300, t: 0.1, dur: 0.12, peak: 0.16, a: 0.002, sat: true, rev: 0.12 });
       }
     },
     // Q 점프: 몸이 솟구치는 묵직한 바람
@@ -712,14 +712,17 @@ function deny(k) {
 function basicAttack(d) {
   P.atkCd = 1 / CFG.iris.as;
   P.face = Math.atan2(d.y - P.y, d.x - P.x);
-  P.swing = 0.18;
   let amt = ad();
   const enh = P.cd.T <= 0;
   if (enh) { amt += CFG.T.base + CFG.T.adRatio * ad(); P.cd.T = cdOf('T'); }
+  P.swing = P.swingDur = enh ? 0.26 : 0.18;
   P.swingEnh = enh;
   SFX.atk(enh);
   hit(d, amt, enh ? '#ff7a4d' : '#e8eaef');
-  addFx({ type: 'arc', x: P.x, y: P.y, ang: P.face, r: CFG.iris.range, spread: 1.2, color: enh ? 0xff6e3c : 0xe6e6f0, dur: 0.18 });
+  if (enh) {   // 위에서 내려친 자리에 작은 충격
+    addFx({ type: 'disc', x: d.x, y: d.y, r: 0.6, color: 0xff6e3c, op: 0.45, dur: 0.25 });
+    addFx({ type: 'ring', x: d.x, y: d.y, r0: 0.2, r1: 0.9, color: 0xffb08f, dur: 0.25 });
+  } else addFx({ type: 'arc', x: P.x, y: P.y, ang: P.face, r: CFG.iris.range, spread: 1.2, color: 0xe6e6f0, dur: 0.18 });
   if (enh) addTxt(d.x, d.y, '강화 평타', '#ff7a4d', 12, 0.7, 3.1);
 }
 
@@ -1045,6 +1048,9 @@ const POSE = {
   hip: [-0.03, 0.98, -0.26],
   swingHp: [[0, [0.02, 1.22, 0.24]], [0.5, [0.32, 1.1, 0.02]], [1, [0.22, 1.05, -0.24]]],
   swingDir: [[0, [-0.35, 0.25, 1]], [0.5, [1, 0, 0]], [1, [0.25, -0.1, -1]]],
+  // 강화 평타: 머리 위로 들었다가 앞으로 내려친다
+  smashHp: [[0, [0.0, 1.72, 0.06]], [0.35, [0.05, 1.8, 0.04]], [0.7, [0.3, 1.45, 0.02]], [1, [0.34, 0.98, 0.02]]],
+  smashDir: [[0, [-0.55, 0.83, 0.05]], [0.35, [-0.8, 0.6, 0]], [0.7, [1, 0.35, 0]], [1, [0.72, -0.7, 0]]],
   // Q 차징: 앞에서 세운 자세 → 머리 뒤로 젖힌 자세까지 차지량에 맞춰 천천히 올린다
   qHold0: { hp: [0.22, 1.12, 0.12], dir: [0.35, 0.9, -0.05] },
   qHold1: { hp: [-0.02, 1.62, 0.02], dir: [-0.6, 0.75, 0.05] },
@@ -1248,7 +1254,9 @@ function animateIris(realDt) {
   } else if (P.dSwing > 0) {
     const k = 1 - P.dSwing / 0.2; hp = kf(POSE.swingHp, k); dir = kf(POSE.swingDir, k);
   } else if (P.swing > 0) {
-    const k = 1 - P.swing / 0.18; hp = kf(POSE.swingHp, k); dir = kf(POSE.swingDir, k);
+    const k = 1 - P.swing / (P.swingDur || 0.18);
+    if (P.swingEnh) { hp = kf(POSE.smashHp, k); dir = kf(POSE.smashDir, k); crouch = 0.08 * Math.max(0, (k - 0.6) / 0.4); }
+    else { hp = kf(POSE.swingHp, k); dir = kf(POSE.swingDir, k); }
   } else if (P.rSpin > 0) {
     [hp, dir] = P3(POSE.spin);
   } else {
