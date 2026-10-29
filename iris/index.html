@@ -478,23 +478,18 @@ const SFX = (() => {
       body({ f0: 55, f1: 110, dur: 0.3, peak: 0.12, a: 0.22 });
       [[440, 0], [659, 0.07], [880, 0.14]].forEach(([fq, t]) => body({ f0: fq, f1: fq * 1.01, t, dur: 0.3, peak: 0.11, a: 0.01, rev: 0.35, sat: false }));
       air({ filter: 'highpass', f0: 4500, f1: 7000, t: 0.12, dur: 0.3, peak: 0.07, a: 0.02, rev: 0.3 });
-      body({ f0: 120, f1: 55, t: 0.26, dur: 0.32, peak: 0.24, rev: 0.3 });
     },
-    // E: 바람이 갈라지는 소리 — 앞을 가르는 쉭 + 뒤로 찢어지는 바람 + 몸통의 낮은 무게
+    // E: 바람이 갈라지는 소리 — 앞을 가르는 쉭 + 뒤로 찢어지는 바람
     e() {
       if (!ready()) return;
       air({ f0: 300, fm: 2200, f1: 500, q: 0.9, dur: 0.32, peak: 1.0, a: 0.02, rev: 0.25 });
       air({ filter: 'highpass', f0: 2500, f1: 5500, dur: 0.16, peak: 0.35, a: 0.01, am: 38, amDepth: 0.6 });
-      air({ filter: 'lowpass', f0: 500, f1: 120, dur: 0.35, peak: 0.6, a: 0.02, sat: true, rev: 0.2 });
-      body({ f0: 90, f1: 55, dur: 0.22, peak: 0.3 });
     },
     // F: 돌진 소리를 높은 음으로 — 같은 바람 결을 더 짧고 날카롭게
     f() {
       if (!ready()) return;
       air({ f0: 560, fm: 4200, f1: 950, q: 0.9, dur: 0.24, peak: 1.0, a: 0.012, rev: 0.3 });
       air({ filter: 'highpass', f0: 4800, f1: 9500, dur: 0.12, peak: 0.35, a: 0.006, am: 70, amDepth: 0.6 });
-      air({ filter: 'lowpass', f0: 950, f1: 230, dur: 0.26, peak: 0.55, a: 0.012, sat: true, rev: 0.25 });
-      body({ f0: 170, f1: 105, dur: 0.16, peak: 0.28 });
     },
     // R 시전: 한 바퀴 도는 무거운 바람 + 쇠사슬이 풀려 나가는 덜컥임
     rCast() {
@@ -502,7 +497,6 @@ const SFX = (() => {
       air({ f0: 160, fm: 650, f1: 220, q: 0.8, dur: 0.5, peak: 0.595, a: 0.06, rev: 0.25 });
       air({ f0: 1500, f1: 900, q: 3, t: 0.12, dur: 0.4, peak: 0.42, am: 24, amDepth: 0.9, rev: 0.3 });
       for (let i = 0; i < 4; i++) metal({ freqs: [1150 + i * 90, 1780 + i * 60], t: 0.14 + i * 0.08, dur: 0.15, peak: 0.084 });
-      body({ f0: 100, f1: 50, t: 0.45, dur: 0.3, peak: 0.315, rev: 0.3 });
     },
     // R 당기기: 쇠사슬이 팽팽하게 감기며 끌려온다 + 도착 쿵
     rPull() {
