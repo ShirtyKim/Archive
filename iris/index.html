@@ -229,7 +229,7 @@
 const CFG = {
   iris: { hp: 1100, ad: 60, as: 0.85, ms: 3.55, range: 2.2, r: 0.45 },
   T: { name: '열받은 한 방', cd: 6, base: 40, adRatio: 0.6 },
-  Q: { name: '배시다운', cd: 8, holdMax: 1.2, autoRelease: 1.5, windup: 0.3, holdSlow: 0.3,
+  Q: { name: '배시다운', cd: 8, holdMax: 1.2, autoRelease: 1.5, windup: 0.3, holdSlow: 0.5,
        offset: 2.2,                       // 아이리스 중심 → 내려찍는 지점까지의 거리 (바라보는 방향)
        inner: [1.5, 2.1], outer: [2.6, 3.6], innerDmg: [80, 1.0], waveDmg: [40, 0.5], airborne: 0.75 },
   W: { name: '블래스티드', cd: 16, dur: 4, ms: 0.25, ad: 0.2 },
@@ -1660,11 +1660,12 @@ const COMBOS = [
   {
     id: 'pull-q', name: '끌어오기 Q 연계',
     summary: '띄우고 묶은 뒤 빠졌다가, 반대쪽으로 끌어와 다시 Q를 맞힌다',
-    steps: ['Q 풀차징', 'Q 놓으며 F + E', '3명 에어본', 'R', '뒤로 빠지기', 'W로 Q 초기화', '반대쪽으로 Q 풀차징', '끌려온 3명에게 Q 적중'],
-    start: { iris: [6, 9], dummies: { A: [15.2, 8.2], B: [16.4, 9.2], C: [15.3, 10.1] } },
+    steps: ['Q 풀차징하며 전진', 'Q 놓으며 F + E', '3명 에어본', 'R', '뒤로 빠지기', 'W로 Q 초기화', '반대쪽으로 Q 풀차징', '끌려온 3명에게 Q 적중'],
+    start: { iris: [3.87, 9], dummies: { A: [15.2, 8.2], B: [16.4, 9.2], C: [15.3, 10.1] } },
     events: () => [
       [0.0, () => demoStep(-1, '')],
-      [0.6, () => { demoStep(0, ''); aim(15.7, 9); startQ(); demoKey('Q', '홀드'); }],
+      [0.6, () => { demoStep(0, ''); aim(15.7, 9); startQ(); demoKey('Q', '홀드'); P.moveT = { x: 6, y: 9 }; }],   // 차징하며 앞으로 걷는다 (이속 50% 감소, 1.2초에 약 2.1m)
+      [0.62, () => demoKey('우클릭', '전진')],
       [1.8, () => { demoStep(1, ''); releaseQ(); demoKey('Q', '떼기'); }],
       [1.82, () => { aim(30, 9); useF(); demoKey('F'); }],
       [1.86, () => { useE(); demoKey('E'); }],
