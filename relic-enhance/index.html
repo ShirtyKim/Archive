@@ -195,7 +195,6 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     <div class="pk-head"><b id="pkTitle">재료 선택</b><span class="pk-sum num" id="pkCount"></span></div>
     <div class="pk-grid" id="pkGrid"></div>
     <div class="pk-foot">
-      <button class="ghost" id="pkSalvage" disabled>분해</button>
       <span class="pk-sum" id="pkSum"></span>
       <button class="go" id="pkDone">완료</button>
     </div>
@@ -431,9 +430,6 @@ function renderPicker(){
   $('pkGrid').querySelectorAll('.cell').forEach(b => b.onclick = () => pick(+b.dataset.uid));
   const pv = preview();
   $('pkSum').innerHTML = mat && S.slots.length ? `예상 <span class="num">+${pv.lv}</span> · ◆ <span class="num">${comma(pv.cost)}</span>` : '';
-  $('pkSalvage').hidden = !mat;
-  const ins = S.inspect && byUid(S.inspect);
-  $('pkSalvage').disabled = !ins || ins.locked || !!ins.eq || inSlots(ins.uid);
   renderInfo();
 }
 function pick(uid){
@@ -453,12 +449,6 @@ function itemsFromExp(exp){
 }
 function giveItems(got){ Object.entries(got).forEach(([k, n]) => S.items[k] += n); }
 const itemsText = got => Object.entries(got).map(([k, n]) => `${ITEMS.find(i => i.id === k).short} ×${n}`).join(', ');
-function salvage(){
-  const rel = byUid(S.inspect); if (!rel) return;
-  const got = itemsFromExp(fodderExp(rel)); giveItems(got);
-  S.relics = S.relics.filter(r => r.uid !== rel.uid); S.inspect = null;
-  toast('분해 : ' + (itemsText(got) || '획득 없음')); render();
-}
 
 // ---------------- 선택 규칙 (6-4) ----------------
 let tmpRule;
@@ -502,7 +492,6 @@ function toast(m){ const el = $('toast'); el.textContent = m; el.hidden = false;
 
 $('changeBtn').onclick = () => openPicker('target');
 $('pkDone').onclick = closePicker;
-$('pkSalvage').onclick = salvage;
 $('tog').onclick = () => { tmpRule.next = !tmpRule.next; drawRule(); };
 $('ruleCancel').onclick = () => $('ruleDlg').hidden = true;
 $('ruleOk').onclick = () => { S.rule = tmpRule; $('ruleDlg').hidden = true; render(); };
