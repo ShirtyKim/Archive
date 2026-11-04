@@ -228,12 +228,12 @@
    ========================================================= */
 const CFG = {
   iris: { hp: 1100, ad: 60, as: 0.85, ms: 3.55, range: 2.2, r: 0.45 },
-  T: { name: '열받은 한 방', cd: 6, base: 40, adRatio: 0.6 },
+  T: { name: '오프닝 스윙', cd: 6, base: 40, adRatio: 0.6 },
   Q: { name: '배시다운', cd: 8, holdMax: 1.2, autoRelease: 1.5, windup: 0.3, holdSlow: 0.5,
        offset: 2.2,                       // 아이리스 중심 → 내려찍는 지점까지의 거리 (바라보는 방향)
        inner: [1.5, 2.1], outer: [2.6, 3.6], innerDmg: [80, 1.0], waveDmg: [40, 0.5], airborne: 0.75 },
-  W: { name: '블래스티드', cd: 16, dur: 4, ms: 0.25, ad: 0.2 },
-  E: { name: '돌진', cd: 9, dist: 3.5, time: 0.18, wallExtra: 1.0 },
+  W: { name: '앙코르', cd: 16, dur: 4, ms: 0.25, ad: 0.2 },
+  E: { name: '대쉬', cd: 9, dist: 3.5, time: 0.18, wallExtra: 1.0 },
   R: { name: '체인 갱', cd: 60, radius: 6, dur: 2.5, breakRange: 9, slow: 0.4, pullTime: 0.25, pullSpread: 0.7, dmg: [150, 0.8] },
   F: { name: '블링크', cd: 30, dist: 4, wallExtra: 1.0 },
   D: { name: '풀 스윙', cd: 25, windup: 0.4, range: 2.6, arc: 110, dmg: [100, 1.0], kb: 3.0, kbTime: 0.25, stun: 1.0 },
@@ -485,7 +485,7 @@ const SFX = (() => {
       air({ f0: 300, fm: 2200, f1: 500, q: 0.9, dur: 0.32, peak: 1.0, a: 0.02, rev: 0.25 });
       air({ filter: 'highpass', f0: 2500, f1: 5500, dur: 0.16, peak: 0.35, a: 0.01, am: 38, amDepth: 0.6 });
     },
-    // F: 돌진 소리를 높은 음으로 — 같은 바람 결을 더 짧고 날카롭게
+    // F: 대쉬 소리를 높은 음으로 — 같은 바람 결을 더 짧고 날카롭게
     f() {
       if (!ready()) return;
       air({ f0: 560, fm: 4200, f1: 950, q: 0.9, dur: 0.24, peak: 1.0, a: 0.012, rev: 0.3 });
@@ -1225,7 +1225,7 @@ function animateIris(realDt) {
   const spin = P.rSpin > 0 ? (1 - P.rSpin / ANIM.rSpin) * Math.PI * 2 : 0;
   iris.rotation.y = -bodyFace - spin;
 
-  // 무기 자세 고르기 (우선순위: Q 점프 > 착지 > Q 차징 > D > 평타 > R 회전 > 기본/돌진)
+  // 무기 자세 고르기 (우선순위: Q 점프 > 착지 > Q 차징 > D > 평타 > R 회전 > 기본/대쉬)
   let hp, dir, freeL = false, crouch = 0;
   const P3 = o => [V3(...o.hp), V3(...o.dir)];
   if (P.qWind) {
@@ -1476,7 +1476,7 @@ function updateHud() {
     e.bar.style.background = s.k === 'R' ? 'var(--acc2)' : 'var(--acc)';
   }
   const bf = [];
-  if (P.wBuff > 0) bf.push(`<span class="buff w">블래스티드 ${P.wBuff.toFixed(1)}s, 이속 +${CFG.W.ms * 100}%, 공격력 +${CFG.W.ad * 100}%</span>`);
+  if (P.wBuff > 0) bf.push(`<span class="buff w">${CFG.W.name} ${P.wBuff.toFixed(1)}s, 이속 +${CFG.W.ms * 100}%, 공격력 +${CFG.W.ad * 100}%</span>`);
   if (P.rT > 0) bf.push(`<span class="buff">체인 갱 ${P.rT.toFixed(1)}s, 사슬 ${P.chains.length}개</span>`);
   if (P.cd.T <= 0) bf.push(`<span class="buff w">다음 평타 강화</span>`);
   bf.push(`<span class="buff n">공격력 ${Math.round(ad())}, 이속 ${moveSpeed().toFixed(2)}m/s</span>`);
@@ -1493,7 +1493,7 @@ function skillDocs() {
     Q: { tag: `쿨타임 ${c.Q.cd}초`, body: `누른 순간의 커서 방향으로 고정된다. 누르고 있으면 떠오르며 범위가 커지고, 떼면 ${c.Q.offset}m 앞을 내리찍어 에어본시킨다.`,
          stat: `피해 안쪽 ${dm(c.Q.innerDmg)} + 충격파 ${dm(c.Q.waveDmg)}, 에어본 ${c.Q.airborne}초, 최대 차지 ${c.Q.holdMax}초` },
     W: { tag: `쿨타임 ${c.W.cd}초`, body: `Q 쿨타임을 초기화하고, ${c.W.dur}초 동안 이동속도와 공격력이 증가한다.`, stat: `이동속도 +${pct(c.W.ms)}, 공격력 +${pct(c.W.ad)}` },
-    E: { tag: `쿨타임 ${c.E.cd}초`, body: `커서 방향으로 짧게 돌진한다. Q 시전 중에도 쓸 수 있고, 얇은 벽은 넘는다.`, stat: `거리 ${c.E.dist}m` },
+    E: { tag: `쿨타임 ${c.E.cd}초`, body: `커서 방향으로 대쉬한다. Q 시전 중에도 쓸 수 있고, 얇은 벽은 넘는다.`, stat: `거리 ${c.E.dist}m` },
     R: { tag: `쿨타임 ${c.R.cd}초`, body: `주변 적을 사슬로 묶고, ${c.R.dur}초 뒤 아이리스 앞 Q 지점으로 끌어온다. 묶인 적은 이동기를 못 쓰고, ${c.R.breakRange}m 밖으로 멀어지면 사슬이 끊긴다.`,
          stat: `범위 ${c.R.radius}m, 피해 ${dm(c.R.dmg)}, 멀어질 때 둔화 ${pct(c.R.slow)}` },
     D: { tag: `쿨타임 ${c.D.cd}초 / 방망이`, body: `커서 방향으로 크게 휘둘러 밀어낸다. 벽에 부딪힌 적은 기절한다.`, stat: `피해 ${dm(c.D.dmg)}, 밀어내기 ${c.D.kb}m, 기절 ${c.D.stun}초` },
