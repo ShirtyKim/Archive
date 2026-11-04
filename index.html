@@ -96,7 +96,7 @@
   </nav>
 
   <main class="grid" id="grid">
-    <!-- 새 프로토타입은 data-date(올린 날짜)와 data-cat(필터 태그, 여러 개면 쉼표)만 맞춰 넣으면 자동으로 최신순 정렬된다 -->
+    <!-- 정렬은 GitHub 커밋 기록에서 각 폴더의 최근 수정 시각을 읽어 자동으로 최근 수정순으로 한다. data-date(올린 날짜)는 기록을 못 읽었을 때 쓰는 예비값이고, data-cat은 필터 태그(여러 개면 쉼표)다 -->
     <a class="card" href="project-mio/" data-date="2026-10-29" data-order="1" data-cat="게임">
       <span class="meta"><span class="num">01</span><span class="date">2026.10.29</span></span>
       <h2>Project Mio</h2>
@@ -152,11 +152,51 @@
   (function () {
     var grid = document.getElementById('grid'), empty = document.getElementById('empty');
     var cards = Array.prototype.slice.call(grid.querySelectorAll('.card'));
-    // 최신순: 날짜가 늦은 것 먼저, 같은 날이면 나중에 올린 것(data-order가 큰 것) 먼저
-    cards.sort(function (a, b) {
-      if (a.dataset.date !== b.dataset.date) return a.dataset.date < b.dataset.date ? 1 : -1;
-      return Number(b.dataset.order) - Number(a.dataset.order);
-    }).forEach(function (c) { grid.appendChild(c); });
+    // 최근 수정순: 수정 시각이 늦은 것 먼저. 수정 시각을 아직 못 읽었으면 data-date(올린 날짜)로, 같으면 data-order가 큰 것 먼저
+    function key(c) { return c.dataset.updated || (c.dataset.date + 'T00:00:00+09:00'); }
+    function sortCards() {
+      cards.slice().sort(function (a, b) {
+        var ka = Date.parse(key(a)), kb = Date.parse(key(b));
+        if (ka !== kb) return kb - ka;
+        return Number(b.dataset.order) - Number(a.dataset.order);
+      }).forEach(function (c) { grid.appendChild(c); });
+    }
+    sortCards();
+
+    // 각 폴더의 마지막 커밋 시각을 GitHub에서 읽어 와 날짜 표시와 정렬에 반영한다 (10분 캐시)
+    var REPO = 'ShirtyKim/Archive', CACHE = 'archive-updated-v1', TTL = 10 * 60 * 1000;
+    function fmt(iso) {
+      var d = new Date(new Date(iso).getTime() + 9 * 3600 * 1000); // 한국 시간 기준 날짜
+      return d.getUTCFullYear() + '.' + String(d.getUTCMonth() + 1).padStart(2, '0') + '.' + String(d.getUTCDate()).padStart(2, '0');
+    }
+    function applyUpdated(map) {
+      cards.forEach(function (c) {
+        var iso = map[c.getAttribute('href').replace(/\/$/, '')];
+        if (!iso) return;
+        c.dataset.updated = iso;
+        var el = c.querySelector('.date');
+        if (el) { el.textContent = '최근 수정 ' + fmt(iso); el.title = '처음 올린 날짜 ' + c.dataset.date.replace(/-/g, '.'); }
+      });
+      sortCards();
+    }
+    var cached = null;
+    try { cached = JSON.parse(localStorage.getItem(CACHE) || 'null'); } catch (e) {}
+    if (cached && cached.map) applyUpdated(cached.map);
+    if (!cached || Date.now() - cached.t > TTL) {
+      Promise.all(cards.map(function (c) {
+        var dir = c.getAttribute('href').replace(/\/$/, '');
+        return fetch('https://api.github.com/repos/' + REPO + '/commits?per_page=1&path=' + encodeURIComponent(dir))
+          .then(function (r) { return r.ok ? r.json() : []; })
+          .then(function (j) { return [dir, j && j[0] && j[0].commit && j[0].commit.committer.date]; })
+          .catch(function () { return [dir, null]; });
+      })).then(function (pairs) {
+        var map = {};
+        pairs.forEach(function (p) { if (p[1]) map[p[0]] = p[1]; });
+        if (!Object.keys(map).length) return;
+        applyUpdated(map);
+        try { localStorage.setItem(CACHE, JSON.stringify({ t: Date.now(), map: map })); } catch (e) {}
+      });
+    }
 
     var chips = document.querySelectorAll('.chip');
     function filter(tag) {
