@@ -83,7 +83,10 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .cell .top small{display:block;font-size:10px;letter-spacing:1px;color:var(--rc)}
 .cell .bot{background:#17191d;font-size:12px;padding:2px 0;font-family:var(--f-num)}
 .cell.sel{outline:3px solid #fff;outline-offset:-3px}
-.cell.lock{filter:brightness(.55)}
+.cell.lock .top,.cell.lock .bot{filter:brightness(.55)}
+.cell .lk{position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:50%;background:#000b;display:grid;place-items:center;font-size:12px;cursor:pointer;z-index:1}
+.cell .lk.off{opacity:.6}
+.cell .lk:hover{opacity:1;background:#000;outline:1px solid var(--mute)}
 .cell .ic{position:absolute;top:3px;right:4px;font-size:12px}
 .cell .eq{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:var(--btn);color:var(--btnfg);font-size:11px;font-weight:700;display:grid;place-items:center}
 .r5{--rc:var(--r5)}.r4{--rc:var(--r4)}.r3{--rc:var(--r3)}.r2{--rc:var(--r2)}
@@ -361,7 +364,7 @@ function cellHTML(rel, opts = {}){
   return `<button class="${cls.join(' ')}" data-uid="${rel.uid}" aria-label="${rel.r}성 ${PARTS[rel.part].name} +${rel.lv}">
     <div class="top"><div><small>${stars(rel.r)}</small>${PARTS[rel.part].name}</div></div>
     <div class="bot">+${rel.lv}</div>
-    ${rel.locked ? '<span class="ic">🔒</span>' : ''}${rel.eq ? `<span class="eq" title="${rel.eq} 장착 중">${rel.eq[0]}</span>` : ''}
+    ${opts.lockBtn ? `<span class="lk${rel.locked ? '' : ' off'}" data-lock="1" role="button" title="${rel.locked ? '잠금 해제' : '잠금'}">${rel.locked ? '🔒' : '🔓'}</span>` : (rel.locked ? '<span class="ic">🔒</span>' : '')}${rel.eq ? `<span class="eq" style="${opts.lockBtn ? 'right:30px' : ''}" title="${rel.eq} 장착 중">${rel.eq[0]}</span>` : ''}
     ${opts.sel ? '<span class="minus" aria-hidden="true">−</span>' : ''}</button>`;
 }
 function render(){
@@ -425,9 +428,9 @@ function renderPicker(){
   list.sort((a, b) => b.r - a.r || a.lv - b.lv || a.part - b.part);
   const relSlots = S.slots.filter(s => s.k === 'relic').length;
   $('pkCount').textContent = mat ? `재료 ${S.slots.length}/8` : '';
-  $('pkGrid').innerHTML = list.length ? list.map(r => cellHTML(r, {sel: mat ? inSlots(r.uid) : r.uid === S.target})).join('')
+  $('pkGrid').innerHTML = list.length ? list.map(r => cellHTML(r, {sel: mat ? inSlots(r.uid) : r.uid === S.target, lockBtn: mat})).join('')
                                       : `<div class="pk-empty">재료로 쓸 유물이 없다</div>`;
-  $('pkGrid').querySelectorAll('.cell').forEach(b => b.onclick = () => pick(+b.dataset.uid));
+  $('pkGrid').querySelectorAll('.cell').forEach(b => b.onclick = e => { if (e.target.closest('[data-lock]')) toggleLock(+b.dataset.uid); else pick(+b.dataset.uid); });
   const pv = preview();
   $('pkSum').innerHTML = mat && S.slots.length ? `예상 <span class="num">+${pv.lv}</span> · ◆ <span class="num">${comma(pv.cost)}</span>` : '';
   renderInfo();
@@ -441,6 +444,11 @@ function pick(uid){
   else if (preview().full) toast('최대 레벨까지 필요한 경험치를 이미 채웠다');
   else S.slots.push({k:'relic', uid});
   render();
+}
+function toggleLock(uid){
+  const rel = byUid(uid); rel.locked = !rel.locked;
+  if (rel.locked) S.slots = S.slots.filter(s => !(s.k === 'relic' && s.uid === uid));
+  toast(rel.locked ? '잠금' : '잠금 해제'); render();
 }
 function renderInfo(){ $('info').hidden = true; }
 function itemsFromExp(exp){
