@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>유물 강화 프로토타입</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Saira+Semi+Condensed:wght@500;700&display=swap">
+<style>
+/* 레이아웃: 왼쪽 탭 | 가운데 유물 | 오른쪽 정보·재료 패널 (기획서 6-1 배치). 재료 선택은 왼쪽~가운데를 덮는 목록(6-2). */
+:root{
+  --bg:#1e2026; --panel:#292c33; --panel2:#33373f; --line:#4a4f59; --fg:#e7e8eb; --mute:#979ca7;
+  --accent:#6fd6c4; --main:#f0a24a; --warn:#ff6e6e; --btn:#d9dbe0; --btnfg:#1d1f24;
+  --r5:#c99a3e; --r4:#9a72d6; --r3:#4f8fd6; --r2:#5fb47e;
+  --f-body:"IBM Plex Sans KR",system-ui,sans-serif; --f-num:"Saira Semi Condensed","IBM Plex Sans KR",sans-serif;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{display:flex;flex-direction:column;gap:6px}
+.back{color:var(--mute);text-decoration:none;font-size:13px;align-self:flex-start}
+.back:hover{color:var(--fg)}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px;box-sizing:border-box}
+*{box-sizing:border-box}
+button{font-family:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.app{position:relative;display:grid;grid-template-columns:170px minmax(0,1fr) minmax(0,400px);gap:16px;flex:1;width:100%;min-height:640px;max-width:1500px;margin:0 auto}
+/* 왼쪽 탭 */
+.tabs{display:flex;flex-direction:column;gap:6px;padding-top:6px}
+.tabs .t{padding:10px 12px;border-radius:6px;color:var(--mute);font-size:14px}
+.tabs .t.on{background:var(--panel2);color:var(--fg);font-weight:700}
+.tabs h1{font-size:15px;margin:0 0 10px;font-weight:700}
+/* 가운데 */
+.center{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-width:0}
+.ring{width:min(300px,60vw);aspect-ratio:1;border-radius:50%;border:3px solid #8b909b;display:grid;place-items:center;position:relative;box-shadow:0 0 0 14px var(--bg),0 0 0 15px var(--line)}
+.ring .core{width:84%;aspect-ratio:1;border-radius:50%;background:var(--panel2);display:grid;place-items:center;text-align:center;line-height:1.5}
+.ring .core b{font-size:18px}
+.ring .core span{display:block;color:var(--mute);font-size:13px}
+.pill{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:4px 16px;font-size:17px}
+.ghost{background:none;border:1px solid var(--line);border-radius:6px;padding:6px 12px;color:var(--mute);font-size:13px}
+.ghost:hover{color:var(--fg);border-color:var(--mute)}
+/* 오른쪽 패널 */
+.panel{position:relative;display:flex;flex-direction:column;gap:10px;min-width:0;overflow:auto;padding-bottom:6px}
+.toprow{display:flex;justify-content:flex-end;gap:8px;align-items:center}
+.cred{background:var(--panel2);border-radius:999px;padding:4px 14px;font-size:14px}
+.lvrow{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.lvrow .lv{font-size:26px;font-weight:700}
+.lvrow .lv .to{color:var(--accent);margin-left:8px}
+.lvrow .ex{color:var(--mute);font-size:15px}
+.lvrow .ex .add{color:var(--accent);margin-right:10px}
+.bar{height:6px;background:var(--panel2);border-radius:3px;position:relative;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;background:#c9ccd3}
+.bar i.pv{background:var(--accent);opacity:.55}
+.stat{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;font-size:14px;border-radius:3px}
+.stat:nth-child(even){background:var(--panel)}
+.stat.main{background:var(--panel2);border-left:4px solid var(--main);color:var(--main);font-weight:700}
+.stat .v{font-family:var(--f-num);font-size:15px}
+.stat .v .up{color:var(--accent)}
+.rnd{color:var(--accent);font-size:13px;padding:2px 10px}
+.cnt{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--btn);color:var(--btnfg);font-size:11px;font-weight:700;margin-left:6px;font-family:var(--f-num)}
+.mat{display:flex;flex-direction:column;gap:8px;margin-top:auto;padding-top:8px}
+.mat .lab{display:flex;align-items:center;gap:10px;color:var(--mute);font-size:13px}
+.mat .lab::after{content:"";flex:1;height:1px;background:var(--line)}
+.bubble{align-self:flex-start;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:3px 12px;font-size:13px}
+.btnrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btnrow button{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:7px 10px;font-size:14px}
+.btnrow button:hover{border-color:var(--mute)}
+.slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.slot{position:relative;aspect-ratio:1/1.05;border-radius:6px 16px 6px 6px;border:1px solid var(--line);background:var(--panel);display:grid;place-items:center;font-size:26px;color:var(--mute);padding:0;overflow:hidden}
+.slot:hover{border-color:var(--mute)}
+.slot.full{font-size:12px;color:var(--fg);border-color:transparent;display:flex;flex-direction:column;justify-content:space-between;align-items:stretch}
+.minus{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--btn);color:var(--btnfg);border:0;font-size:15px;line-height:20px;padding:0;font-weight:700}
+.costrow{display:flex;justify-content:space-between;font-size:14px;color:var(--mute)}
+.costrow .num{color:var(--fg)}
+.costrow.short .num{color:var(--warn)}
+.go{background:var(--btn);color:var(--btnfg);border:0;border-radius:999px;padding:12px;font-size:17px;font-weight:700}
+.go:disabled{background:#5d616b;color:#9a9ea8;cursor:not-allowed}
+.maxnote{margin-top:auto;text-align:center;color:var(--accent);background:var(--panel);border-radius:999px;padding:12px;font-size:14px}
+/* 유물 칸 (목록 · 재료 칸 공용) */
+.cell{position:relative;border-radius:6px;overflow:hidden;border:0;padding:0;background:var(--panel2);display:flex;flex-direction:column;justify-content:space-between;text-align:center;min-height:84px}
+.cell .top{flex:1;display:grid;place-items:center;padding:16px 2px 2px;font-size:13px;line-height:1.3;background:linear-gradient(180deg,var(--rc) -60%,transparent 120%)}
+.cell .top small{display:block;font-size:10px;letter-spacing:1px;color:var(--rc)}
+.cell .bot{background:#17191d;font-size:12px;padding:2px 0;font-family:var(--f-num)}
+.cell.sel{outline:3px solid #fff;outline-offset:-3px}
+.cell.lock{filter:brightness(.55)}
+.cell .ic{position:absolute;top:3px;right:4px;font-size:12px}
+.cell .eq{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:var(--btn);color:var(--btnfg);font-size:11px;font-weight:700;display:grid;place-items:center}
+.r5{--rc:var(--r5)}.r4{--rc:var(--r4)}.r3{--rc:var(--r3)}.r2{--rc:var(--r2)}
+/* 재료 선택 (6-2) */
+.picker{position:absolute;left:0;top:0;bottom:0;right:calc(min(400px,100%) + 16px);background:var(--bg);border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;z-index:5}
+.pk-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);gap:10px}
+.pk-head b{font-size:15px}
+.pk-grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px;padding:12px;align-content:start}
+.pk-empty{grid-column:1/-1;color:var(--mute);text-align:center;padding:40px 0}
+.pk-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--line)}
+.pk-sum{color:var(--mute);font-size:13px}
+.pk-sum .num{color:var(--accent)}
+.pk-foot .go{padding:8px 26px;font-size:15px}
+/* 유물 정보 카드 (19) */
+.info{position:absolute;top:44px;right:0;width:min(300px,100%);background:#24272d;border:1px solid var(--mute);border-radius:6px;padding:14px;z-index:6;box-shadow:0 10px 30px #000a;display:flex;flex-direction:column;gap:6px}
+.info h3{margin:0;font-size:15px}
+.info .sub{color:var(--mute);font-size:12px}
+.info .acts{display:flex;gap:6px;margin-top:6px}
+.info .acts button{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px;font-size:13px}
+.info .acts button:disabled{opacity:.4;cursor:not-allowed}
+/* 팝업 */
+.modal{position:fixed;inset:0;background:#000b;display:grid;place-items:center;z-index:20;padding:16px}
+.dlg{background:#e6e7eb;color:#24262c;border-radius:6px 40px 6px 6px;width:min(620px,100%);overflow:hidden}
+.dlg .in{padding:22px 26px;display:flex;flex-direction:column;gap:12px}
+.dlg h2{margin:0;text-align:center;font-size:22px;font-weight:500}
+.dlg .k{font-size:14px;color:#4a4c55}
+.radios{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.radio{display:flex;justify-content:space-between;align-items:center;background:#fafafb;border:1px solid #d5d6dc;border-radius:4px;padding:10px 14px;font-size:16px;color:#24262c}
+.radio .dot{width:20px;height:20px;border-radius:50%;border:2px solid #a9abb4}
+.radio[aria-checked="true"] .dot{border-color:#e08b2a;background:radial-gradient(circle,#e08b2a 45%,transparent 50%)}
+.tog{display:flex;align-items:center;gap:12px;background:none;border:0;font-size:16px;color:#24262c;padding:0}
+.tog .sw{width:48px;height:26px;border-radius:13px;background:#b9bbc3;position:relative;transition:background .15s}
+.tog .sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s}
+.tog[aria-checked="true"] .sw{background:#e08b2a}
+.tog[aria-checked="true"] .sw::after{left:25px}
+.dlg .hint{font-size:12px;color:#777a84;line-height:1.5}
+.dlg .bt{background:#2b2a31;display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px 26px}
+.dlg .bt button{background:#f2f2f4;color:#24262c;border:0;border-radius:999px;padding:10px;font-size:16px}
+.rules{margin:0;padding-left:18px;line-height:1.8;font-size:14px}
+/* 레벨업 결과 (6-5) */
+.result{position:fixed;inset:0;z-index:30;background:#05060ad9;cursor:pointer}
+.band{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);min-height:340px;background:#0b0c11;border-block:2px solid var(--accent);display:flex;align-items:center;justify-content:center;gap:clamp(20px,6vw,90px);padding:24px max(16px,env(safe-area-inset-left,0px));flex-wrap:wrap}
+.pillar{position:absolute;top:-30vh;bottom:-30vh;width:150px;left:calc(50% - 280px);background:linear-gradient(90deg,transparent,#6fd6c455,#aef3e899,#6fd6c455,transparent);pointer-events:none;animation:rise .6s ease-out}
+.glow{width:220px;aspect-ratio:1;border-radius:50%;border:4px solid #8ef0dc;background:radial-gradient(circle,#4fb8a6,#17524b 72%);box-shadow:0 0 40px #78f0dcaa;display:grid;place-items:center;text-align:center;font-weight:700;position:relative;animation:pop .5s ease-out}
+.rbox{min-width:min(420px,100%);display:flex;flex-direction:column;gap:6px}
+.rbox h2{margin:0;font-size:40px}
+.rbox .lvs{font-size:28px;margin-bottom:6px}
+.rbox .lvs .to{color:var(--accent)}
+.rrow{display:grid;grid-template-columns:1fr 70px 24px 90px 26px;align-items:center;padding:6px 10px;font-size:15px}
+.rrow.main{background:#ffffff22;color:var(--main)}
+.rrow .a{text-align:right;font-family:var(--f-num)}
+.rrow .d{text-align:center;color:#7d8296}
+.rrow .b{text-align:right;color:var(--accent);font-family:var(--f-num)}
+.new{display:inline-block;background:#ffb84d;color:#000;border-radius:10px;padding:0 8px;font-size:12px;font-weight:700;margin-right:8px}
+.ret{color:var(--mute);font-size:13px;margin-top:6px}
+.close{position:absolute;bottom:12%;left:0;right:0;text-align:center;color:#c9cfe0}
+@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}
+@keyframes rise{from{opacity:0;transform:scaleY(.4)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.glow,.pillar{animation:none}}
+/* 마우스 오버 정보 */
+.tip{position:fixed;z-index:50;pointer-events:none;width:250px;background:#24272d;border:1px solid var(--mute);border-radius:6px;padding:10px 12px;box-shadow:0 10px 30px #000a;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.tip .th{font-size:14px;font-weight:700}
+.tip .ts{color:var(--mute);font-size:12px}
+.tip .stat{padding:4px 8px;font-size:13px}
+/* 토스트 · 테스트 도구 */
+.toast{position:fixed;left:50%;top:22%;transform:translateX(-50%);background:#000d;border:1px solid var(--line);padding:10px 20px;border-radius:6px;z-index:40;font-size:14px;pointer-events:none}
+.dev{position:absolute;left:0;bottom:0;display:flex;flex-direction:column;gap:6px}
+.dev button{background:none;border:1px dashed var(--line);border-radius:4px;color:var(--mute);font-size:11px;padding:4px 6px;text-align:left}
+.dev span{color:#6b707b;font-size:11px}
+@media (max-width:900px){
+  .app{grid-template-columns:minmax(0,1fr);height:auto}
+  .tabs{display:none}
+  .ring{width:170px}
+  .picker{position:fixed;inset:0;right:0;border-radius:0;border:0}
+  .info{position:fixed;top:auto;bottom:70px;right:16px;left:16px;width:auto}
+  .dev{position:static;flex-direction:row;flex-wrap:wrap}
+  .band{position:absolute;top:50%}
+  .pillar{left:calc(50% - 75px)}
+}
+</style>
+
+</head>
+<body>
+<a class="back" href="../">← 아카이브</a>
+<div class="app" id="app">
+  <aside class="tabs">
+    <h1>유물 상세</h1>
+    <div class="t">상세</div>
+    <div class="t on">강화</div>
+    <div class="t">재설정</div>
+    <div class="dev">
+      <span>테스트</span>
+      <button id="devCred">신용 포인트 +100만</button>
+      <button id="devRelic">재료 유물 +10</button>
+      <button id="devPoor">신용 포인트 0으로</button>
+      <button id="devReset">처음 상태로</button>
+    </div>
+  </aside>
+
+  <section class="center">
+    <div class="ring"><div class="core" id="core"></div></div>
+    <div class="pill num" id="lvPill"></div>
+    <button class="ghost" id="changeBtn">강화할 유물 변경</button>
+  </section>
+
+  <section class="panel" id="panel"></section>
+
+  <div class="picker" id="picker" hidden>
+    <div class="pk-head"><b id="pkTitle">재료 선택</b><span class="pk-sum num" id="pkCount"></span></div>
+    <div class="pk-grid" id="pkGrid"></div>
+    <div class="pk-foot">
+      <button class="ghost" id="pkSalvage" disabled>분해</button>
+      <span class="pk-sum" id="pkSum"></span>
+      <button class="go" id="pkDone">완료</button>
+    </div>
+  </div>
+  <div class="info" id="info" hidden></div>
+</div>
+
+<div class="modal" id="ruleDlg" hidden>
+  <div class="dlg" role="dialog" aria-labelledby="ruleT">
+    <div class="in">
+      <h2 id="ruleT">선택 규칙</h2>
+      <div class="k">• 강화 재료 희귀도</div>
+      <div class="radios" role="radiogroup" id="radios"></div>
+      <div class="k">• 강화 최대치</div>
+      <button class="tog" id="tog" role="switch" aria-checked="false"><span class="sw"></span>다음 노드까지 강화</button>
+      <div class="hint">켜면 자동 선택이 다음 3의 배수 레벨(+3/+6/+9/+12/+15)까지만 재료를 넣는다.</div>
+    </div>
+    <div class="bt"><button id="ruleCancel">⊗ 취소</button><button id="ruleOk">✓ 확인</button></div>
+  </div>
+</div>
+
+<div class="modal" id="helpDlg" hidden>
+  <div class="dlg"><div class="in">
+    <h2>규칙 설명</h2>
+    <ul class="rules">
+      <li>최대 레벨 = 성급 × 3</li>
+      <li>3의 배수 레벨마다 보조옵션 1개 추가, 4개면 1개 랜덤 강화</li>
+      <li>재료 유물 경험치 = 기본 경험치 + 누적 경험치 × 0.8</li>
+      <li>소모 신용 포인트 = 추가 경험치 × 1.5</li>
+      <li>최대 레벨을 넘는 경험치는 재료 아이템으로 반환</li>
+    </ul>
+  </div><div class="bt" style="grid-template-columns:1fr"><button id="helpOk">확인</button></div></div>
+</div>
+
+<div class="result" id="result" hidden></div>
+<div class="toast" id="toast" hidden></div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+// ---------------- 데이터 테이블 ----------------
+const R_SCALE = {5:1, 4:0.8, 3:0.6, 2:0.4};
+const F = {5:1, 4:0.6, 3:0.35, 2:0.2};
+const C5 = [500,800,1100,1360,1640,1950,2300,2660,3050,3480,3960,4500,5120,5800,6600];
+const BASE_EXP = {2:100, 3:300, 4:750, 5:1500};       // Relic_BaseExpProvide
+const FODDER_RATE = 0.8;                                // Relic_FodderExpRate
+const CREDIT_RATE = 1.5;
+const INIT_SUB = {5:[3,4], 4:[2,3], 3:[1,2], 2:[0,1]};
+const ITEMS = [ {id:'dust', name:'유실된 라이트더스트', short:'라이트더스트', r:2, exp:100},
+                {id:'gold', name:'유실된 황금 파편', short:'황금 파편', r:3, exp:500},
+                {id:'crys', name:'유실된 수정덩이', short:'수정덩이', r:4, exp:1000} ];
+const ELEM = ['물리 피해','화염 피해','얼음 피해','번개 피해','바람 피해','양자 피해','허수 피해'];
+const PARTS = {
+  1:{name:'머리', mains:['HP']}, 2:{name:'손', mains:['공격력']},
+  3:{name:'몸통', mains:['HP%','공격력%','방어력%','치명타 확률','치명타 피해','치유량 보너스','효과 명중']},
+  4:{name:'다리', mains:['HP%','공격력%','방어력%','속도']},
+  5:{name:'차원 구체', mains:['HP%','공격력%','방어력%',...ELEM]},
+  6:{name:'연결 매듭', mains:['HP%','공격력%','방어력%','격파 특수효과','에너지 회복효율']} };
+// [기본값, 레벨당 증가량, 표기] 표기 0=정수 1=% 2=소수
+const MAIN = {'HP':[112.896,39.5136,0],'공격력':[56.448,19.7568,0],'HP%':[6.912,2.4192,1],'공격력%':[6.912,2.4192,1],
+  '방어력%':[8.64,3.024,1],'치명타 확률':[5.184,1.8144,1],'치명타 피해':[10.368,3.6288,1],'치유량 보너스':[5.5296,1.9354,1],
+  '효과 명중':[6.912,2.4192,1],'속도':[4.032,1.4,2],'격파 특수효과':[10.368,3.6288,1],'에너지 회복효율':[3.1104,1.0886,1]};
+ELEM.forEach(e => MAIN[e] = [6.2208,2.1773,1]);
+// [최소, 중간, 최대, 표기]
+const SUB = {'HP':[33.87,38.10,42.34,0],'공격력':[16.94,19.05,21.17,0],'방어력':[16.94,19.05,21.17,0],
+  'HP%':[3.456,3.888,4.32,1],'공격력%':[3.456,3.888,4.32,1],'방어력%':[4.32,4.86,5.4,1],'속도':[2,2.3,2.6,2],
+  '치명타 확률':[2.592,2.916,3.24,1],'치명타 피해':[5.184,5.832,6.48,1],'효과 명중':[3.456,3.888,4.32,1],
+  '효과 저항':[3.456,3.888,4.32,1],'격파 특수효과':[5.184,5.832,6.48,1]};
+const CHARS = ['단항','히메코','브로냐','제레','경원','카프카','반디','블레이드'];
+
+const maxLv = r => r * 3;
+const curve = r => C5.slice(0, maxLv(r)).map(v => Math.round(v * F[r] / 10) * 10);
+const cum = (r, lv) => curve(r).slice(0, lv).reduce((a, b) => a + b, 0);
+function lvFromExp(r, exp){ const c = curve(r); let lv = 0, s = 0; while (lv < c.length && s + c[lv] <= exp){ s += c[lv]; lv++; } return lv; }
+const fodderExp = rel => BASE_EXP[rel.r] + Math.floor(rel.exp * FODDER_RATE);
+const mainVal = (rel, lv = rel.lv) => (MAIN[rel.main][0] + MAIN[rel.main][1] * lv) * R_SCALE[rel.r];
+const rand = a => a[Math.floor(Math.random() * a.length)];
+const stars = n => '★'.repeat(n);
+function fmt(v, t){ if (t === 0) return String(Math.floor(v)); const s = (Math.floor(v * 10 + 1e-6) / 10).toFixed(1); return t === 1 ? s + '%' : s; }
+const fmtMain = (rel, v) => fmt(v, MAIN[rel.main][2]);
+const fmtSub = (n, v) => fmt(v, SUB[n][3]);
+const comma = n => Math.round(n).toLocaleString('ko-KR');
+
+// ---------------- 유물 생성 ----------------
+let UID = 1000;
+function addSub(rel, rec){
+  const used = new Set([rel.main, ...rel.subs.map(s => s.n)]);
+  const pool = Object.keys(SUB).filter(n => !used.has(n));
+  const n = rand(pool), v = rand(SUB[n].slice(0,3)) * R_SCALE[rel.r];
+  rel.subs.push({n, v, c:1});
+  if (rec) rec.push({n, a:0, b:v, g:1, isNew:true});
+}
+function rollSub(rel, rec){
+  const s = rand(rel.subs), before = s.v;
+  s.v += rand(SUB[s.n].slice(0,3)) * R_SCALE[rel.r]; s.c++;
+  if (rec){ const e = rec.find(x => x.n === s.n); if (e){ e.b = s.v; e.g++; } else rec.push({n:s.n, a:before, b:s.v, g:1, isNew:false}); }
+}
+function levelUpTo(rel, to, rec){
+  for (let L = rel.lv + 1; L <= to; L++){ if (L % 3 === 0){ rel.subs.length < 4 ? addSub(rel, rec) : rollSub(rel, rec); } }
+  rel.lv = to;
+}
+function makeRelic(r, part, lv = 0, o = {}){
+  const rel = {uid: UID++, r, part, lv:0, exp:0, main: o.main || rand(PARTS[part].mains), subs:[], locked:!!o.locked, eq:o.eq || null};
+  const [a, b] = INIT_SUB[r]; const k = a + Math.floor(Math.random() * (b - a + 1));
+  for (let i = 0; i < k; i++) addSub(rel);
+  levelUpTo(rel, lv);
+  rel.exp = cum(r, lv) + (o.extra || 0);
+  return rel;
+}
+const randPart = () => 1 + Math.floor(Math.random() * 6);
+
+let S;
+function initState(){
+  UID = 1000;
+  const target = makeRelic(5, 3, 3, {main:'치명타 확률', extra:200});
+  const relics = [target];
+  const plan = [[5,14],[4,16],[3,14],[2,10]];
+  plan.forEach(([r, n]) => { for (let i = 0; i < n; i++) relics.push(makeRelic(r, randPart())); });
+  relics.push(makeRelic(5, 4, 15, {eq:'반디', main:'속도'}));
+  relics.push(makeRelic(5, 1, 12, {eq:'경원'}));
+  relics.push(makeRelic(4, 6, 6, {eq:'히메코'}));
+  relics.push(makeRelic(5, 3, 0, {locked:true, main:'치명타 피해'}));
+  relics.push(makeRelic(5, 5, 3, {locked:true, main:'번개 피해'}));
+  relics.push(makeRelic(4, 2, 0, {locked:true}));
+  relics.push(makeRelic(5, 6, 6));
+  relics.push(makeRelic(4, 4, 3));
+  S = { relics, items:{dust:120, gold:60, crys:30}, credits:2000000, target:target.uid, slots:[],
+        rule:{max:2, next:false}, picker:null, inspect:null };
+}
+
+// ---------------- 계산 ----------------
+const byUid = uid => S.relics.find(x => x.uid === uid);
+const tgt = () => byUid(S.target);
+const slotExp = sl => sl.k === 'relic' ? fodderExp(byUid(sl.uid)) : ITEMS.find(i => i.id === sl.id).exp * sl.n;
+const addedExp = (slots = S.slots) => slots.reduce((a, sl) => a + slotExp(sl), 0);
+function preview(slots = S.slots){
+  const t = tgt(), add = addedExp(slots), cap = cum(t.r, maxLv(t.r));
+  const eff = Math.min(add, cap - t.exp), exp = t.exp + eff, lv = lvFromExp(t.r, exp);
+  let nodes = 0; for (let L = t.lv + 1; L <= lv; L++) if (L % 3 === 0) nodes++;
+  return {add, eff, exp, lv, nodes, cost: Math.ceil(eff * CREDIT_RATE), full: exp >= cap, overflow: Math.max(0, add - eff)};
+}
+const inSlots = uid => S.slots.some(s => s.k === 'relic' && s.uid === uid);
+const usable = rel => rel.uid !== S.target && !rel.locked;
+function autoPick(){
+  const t = tgt(), cap = cum(t.r, maxLv(t.r));
+  let goal = cap;
+  if (S.rule.next){ const n = Math.min(maxLv(t.r), (Math.floor(t.lv / 3) + 1) * 3); goal = cum(t.r, n); }
+  let need = goal - t.exp; const slots = [];
+  const cands = [];
+  ITEMS.forEach(it => { if (it.r <= S.rule.max && S.items[it.id] > 0) cands.push({k:'item', it, r:it.r, e:it.exp, o:0}); });
+  S.relics.forEach(rel => { if (usable(rel) && !rel.eq && rel.lv === 0 && rel.r <= S.rule.max) cands.push({k:'relic', rel, r:rel.r, e:fodderExp(rel), o:1}); });
+  cands.sort((a, b) => a.r - b.r || a.o - b.o || a.e - b.e);
+  for (const c of cands){
+    if (need <= 0 || slots.length >= 8) break;
+    if (c.k === 'item'){ const n = Math.min(S.items[c.it.id], Math.ceil(need / c.it.exp)); slots.push({k:'item', id:c.it.id, n}); need -= n * c.it.exp; }
+    else { slots.push({k:'relic', uid:c.rel.uid}); need -= c.e; }
+  }
+  return slots;
+}
+
+// ---------------- 렌더 ----------------
+const $ = id => document.getElementById(id);
+function cellHTML(rel, opts = {}){
+  const cls = ['cell', 'r' + rel.r]; if (opts.sel) cls.push('sel'); if (rel.locked) cls.push('lock');
+  return `<button class="${cls.join(' ')}" data-uid="${rel.uid}" aria-label="${rel.r}성 ${PARTS[rel.part].name} +${rel.lv}">
+    <div class="top"><div><small>${stars(rel.r)}</small>${PARTS[rel.part].name}</div></div>
+    <div class="bot">+${rel.lv}</div>
+    ${rel.locked ? '<span class="ic">🔒</span>' : ''}${rel.eq ? `<span class="eq" title="${rel.eq} 장착 중">${rel.eq[0]}</span>` : ''}
+    ${opts.sel ? '<span class="minus" aria-hidden="true">−</span>' : ''}</button>`;
+}
+function render(){
+  const t = tgt(), pv = preview(), has = S.slots.length > 0, isMax = t.lv >= maxLv(t.r);
+  const c = curve(t.r);
+  $('core').innerHTML = `<div><b>${PARTS[t.part].name}</b><span>${stars(t.r)} · ${t.main}</span></div>`;
+  $('lvPill').textContent = '◉ +' + t.lv;
+
+  const expIn = t.exp - cum(t.r, t.lv), need = c[t.lv] || 0;
+  let pvW = 0;
+  if (has && !isMax) pvW = pv.lv > t.lv ? 100 : (expIn + pv.eff) / need * 100;
+  const curW = isMax ? 100 : expIn / need * 100;
+  const short = has && S.credits < pv.cost;
+
+  let h = `<div class="toprow"><button class="ghost" id="helpBtn">ⓘ 규칙 설명</button><span class="cred num">◆ ${comma(S.credits)}</span></div>`;
+  h += `<div class="lvrow"><span class="lv num">+${t.lv}${has && pv.lv > t.lv ? `<span class="to">+${pv.lv}</span>` : ''}</span>
+        <span class="ex num">${isMax ? '<span class="add">최고 레벨</span>' : `${has ? `<span class="add">+${comma(pv.eff)}</span>` : ''}${comma(expIn)}/${comma(need)}`}</span></div>`;
+  h += `<div class="bar"><i class="pv" style="width:${pvW}%"></i><i style="width:${curW}%"></i></div>`;
+  h += `<div class="stats"><div class="stat main"><span>${t.main}</span><span class="v">${fmtMain(t, mainVal(t))}${has && pv.lv > t.lv ? ` <span class="up">➜ ${fmtMain(t, mainVal(t, pv.lv))}▲</span>` : ''}</span></div>`;
+  if (has && pv.nodes > 0) h += `<div class="rnd">속성 ${pv.nodes}개 랜덤 증가</div>`;
+  t.subs.forEach(s => { h += `<div class="stat"><span>${s.n}</span><span class="v">${fmtSub(s.n, s.v)}${s.c > 1 ? `<span class="cnt">${s.c - 1}</span>` : ''}</span></div>`; });
+  h += `</div>`;
+
+  if (isMax){
+    h += `<div class="maxnote">현재 최고 레벨까지 강화되었습니다</div>`;
+  } else {
+    h += `<div class="mat"><div class="lab">소모 재료</div>`;
+    if (!has){ const mx = preview(autoPick()).lv; h += `<div class="bubble">이번 강화 최대치: +${mx}</div>`; }
+    h += `<div class="btnrow"><button id="ruleBtn">⧗ ★${S.rule.max} 이하${S.rule.next ? ' · 노드' : ''}</button><button id="autoBtn">${has ? '모두 해제' : '자동 선택'}</button></div>`;
+    h += `<div class="slots">`;
+    for (let i = 0; i < 8; i++){
+      const sl = S.slots[i];
+      if (!sl){ h += `<button class="slot" data-slot="${i}" aria-label="재료 넣기">+</button>`; continue; }
+      if (sl.k === 'relic'){ const rel = byUid(sl.uid); h += `<div class="slot full cell r${rel.r}" style="min-height:0" data-tip="r:${rel.uid}"><div class="top"><div><small>${stars(rel.r)}</small>${PARTS[rel.part].name}</div></div><div class="bot">+${rel.lv}</div><button class="minus" data-rm="${i}" aria-label="빼기">−</button></div>`; }
+      else { const it = ITEMS.find(x => x.id === sl.id); h += `<div class="slot full cell r${it.r}" style="min-height:0" data-tip="i:${it.id}:${sl.n}"><div class="top"><div><small>${stars(it.r)}</small>${it.short}</div></div><div class="bot">×${sl.n}</div><button class="minus" data-rm="${i}" aria-label="빼기">−</button></div>`; }
+    }
+    h += `</div><div class="costrow${short ? ' short' : ''}"><span>소모 신용 포인트</span><span class="num">◆ ×${comma(has ? pv.cost : 0)}</span></div>`;
+    h += `<button class="go" id="goBtn" ${has ? '' : 'disabled'}>강화</button></div>`;
+  }
+  $('panel').innerHTML = h;
+  bindPanel();
+  if (S.picker) renderPicker();
+}
+function bindPanel(){
+  $('helpBtn').onclick = () => $('helpDlg').hidden = false;
+  const rb = $('ruleBtn'); if (!rb) return;
+  rb.onclick = openRule;
+  $('autoBtn').onclick = () => { if (S.slots.length) S.slots = []; else { S.slots = autoPick(); if (!S.slots.length) toast('자동 선택할 재료가 없다'); } render(); };
+  document.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => openPicker('mat'));
+  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = e => { e.stopPropagation(); S.slots.splice(+b.dataset.rm, 1); render(); });
+  $('goBtn').onclick = enhance;
+}
+
+// ---------------- 재료 선택 (6-2) ----------------
+function openPicker(mode){ S.picker = mode; S.inspect = null; $('picker').hidden = false; renderPicker(); }
+function closePicker(){ S.picker = null; S.inspect = null; $('picker').hidden = true; $('info').hidden = true; render(); }
+function renderPicker(){
+  const mat = S.picker === 'mat';
+  $('pkTitle').textContent = mat ? '재료 선택' : '강화할 유물 선택';
+  let list = S.relics.filter(r => mat ? r.uid !== S.target : true);
+  list.sort((a, b) => b.r - a.r || a.lv - b.lv || a.part - b.part);
+  const relSlots = S.slots.filter(s => s.k === 'relic').length;
+  $('pkCount').textContent = mat ? `재료 ${S.slots.length}/8` : '';
+  $('pkGrid').innerHTML = list.length ? list.map(r => cellHTML(r, {sel: mat ? inSlots(r.uid) : r.uid === S.target})).join('')
+                                      : `<div class="pk-empty">재료로 쓸 유물이 없다</div>`;
+  $('pkGrid').querySelectorAll('.cell').forEach(b => b.onclick = () => pick(+b.dataset.uid));
+  const pv = preview();
+  $('pkSum').innerHTML = mat && S.slots.length ? `예상 <span class="num">+${pv.lv}</span> · ◆ <span class="num">${comma(pv.cost)}</span>` : '';
+  $('pkSalvage').hidden = !mat;
+  const ins = S.inspect && byUid(S.inspect);
+  $('pkSalvage').disabled = !ins || ins.locked || !!ins.eq || inSlots(ins.uid);
+  renderInfo();
+}
+function pick(uid){
+  const rel = byUid(uid); S.inspect = uid;
+  if (S.picker === 'target'){ S.target = uid; S.slots = []; closePicker(); return; }
+  if (inSlots(uid)){ S.slots = S.slots.filter(s => !(s.k === 'relic' && s.uid === uid)); }
+  else if (rel.locked) toast('잠금 유물은 재료로 쓸 수 없다');
+  else if (S.slots.length >= 8) toast('재료 칸이 가득 찼다');
+  else if (preview().full) toast('최대 레벨까지 필요한 경험치를 이미 채웠다');
+  else S.slots.push({k:'relic', uid});
+  render();
+}
+function renderInfo(){
+  const box = $('info'), rel = S.inspect && byUid(S.inspect);
+  if (!rel || !S.picker){ box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = `<h3>${stars(rel.r)} ${PARTS[rel.part].name} <span class="num">+${rel.lv}</span></h3>
+    <div class="sub">${rel.eq ? rel.eq + ' 장착 중 · ' : ''}재료로 쓰면 경험치 ${comma(fodderExp(rel))}</div>
+    <div class="stat main"><span>${rel.main}</span><span class="v">${fmtMain(rel, mainVal(rel))}</span></div>
+    ${rel.subs.map(s => `<div class="stat"><span>${s.n}</span><span class="v">${fmtSub(s.n, s.v)}${s.c > 1 ? `<span class="cnt">${s.c - 1}</span>` : ''}</span></div>`).join('') || '<div class="sub">보조옵션 없음</div>'}
+    <div class="acts"><button id="lockBtn" ${rel.uid === S.target ? 'disabled' : ''}>${rel.locked ? '잠금 해제' : '잠금'}</button><button id="infoX">닫기</button></div>`;
+  $('lockBtn').onclick = () => { rel.locked = !rel.locked; if (rel.locked) S.slots = S.slots.filter(s => !(s.k === 'relic' && s.uid === rel.uid)); render(); };
+  $('infoX').onclick = () => { S.inspect = null; renderPicker(); };
+}
+function itemsFromExp(exp){
+  const got = {}; for (const it of [...ITEMS].reverse()){ const n = Math.floor(exp / it.exp); if (n){ got[it.id] = n; exp -= n * it.exp; } }
+  return got;
+}
+function giveItems(got){ Object.entries(got).forEach(([k, n]) => S.items[k] += n); }
+const itemsText = got => Object.entries(got).map(([k, n]) => `${ITEMS.find(i => i.id === k).short} ×${n}`).join(', ');
+function salvage(){
+  const rel = byUid(S.inspect); if (!rel) return;
+  const got = itemsFromExp(fodderExp(rel)); giveItems(got);
+  S.relics = S.relics.filter(r => r.uid !== rel.uid); S.inspect = null;
+  toast('분해 : ' + (itemsText(got) || '획득 없음')); render();
+}
+
+// ---------------- 선택 규칙 (6-4) ----------------
+let tmpRule;
+function openRule(){ tmpRule = {...S.rule}; drawRule(); $('ruleDlg').hidden = false; }
+function drawRule(){
+  $('radios').innerHTML = [2,3,4].map(n => `<button class="radio" role="radio" aria-checked="${tmpRule.max === n}" data-n="${n}">★${n} 이하<span class="dot"></span></button>`).join('');
+  $('radios').querySelectorAll('.radio').forEach(b => b.onclick = () => { tmpRule.max = +b.dataset.n; drawRule(); });
+  $('tog').setAttribute('aria-checked', tmpRule.next);
+}
+
+// ---------------- 강화 실행 (F7 ~ F16) ----------------
+function enhance(){
+  if (!S.slots.length) return;
+  const t = tgt(), pv = preview();
+  if (S.credits < pv.cost){ toast('신용 포인트가 부족하다'); return; }
+  S.slots.forEach(sl => { if (sl.k === 'relic') S.relics = S.relics.filter(r => r.uid !== sl.uid); else S.items[sl.id] -= sl.n; });
+  S.credits -= pv.cost;
+  const fromLv = t.lv, mainBefore = mainVal(t);
+  const ret = itemsFromExp(pv.overflow); giveItems(ret);
+  t.exp = pv.exp; S.slots = [];
+  const rec = [];
+  levelUpTo(t, pv.lv, rec);
+  if (pv.lv > fromLv) showResult(t, fromLv, mainBefore, rec, ret);
+  else { render(); toast('경험치 +' + comma(pv.eff)); }
+}
+function showResult(t, fromLv, mainBefore, rec, ret){
+  render();
+  const rows = rec.map(r => `<div class="rrow"><span>${r.isNew ? '<span class="new">New</span>' : ''}${r.n}</span><span class="a">${r.isNew ? '0' : fmtSub(r.n, r.a)}</span><span class="d">◈</span><span class="b">${fmtSub(r.n, r.b)}▲</span><span>${r.isNew ? '' : `<span class="cnt">${r.g}</span>`}</span></div>`).join('');
+  $('result').innerHTML = `<div class="band"><div class="pillar"></div>
+    <div class="glow"><div>${PARTS[t.part].name}<br><span style="font-weight:400;font-size:13px">${stars(t.r)}</span></div></div>
+    <div class="rbox"><h2>레벨업</h2><div class="lvs num">Lv. ${fromLv} <span class="to">› Lv. ${t.lv}</span></div>
+      <div class="rrow main"><span>${t.main}</span><span class="a">${fmtMain(t, mainBefore)}</span><span class="d">◈</span><span class="b">${fmtMain(t, mainVal(t))}▲</span><span></span></div>
+      ${rows}${Object.keys(ret).length ? `<div class="ret">초과 경험치 반환 : ${itemsText(ret)}</div>` : ''}</div></div>
+    <div class="close">빈 곳을 터치해 닫기</div>`;
+  $('result').hidden = false;
+}
+
+// ---------------- 공용 ----------------
+let toastT;
+function toast(m){ const el = $('toast'); el.textContent = m; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 1600); }
+
+$('changeBtn').onclick = () => openPicker('target');
+$('pkDone').onclick = closePicker;
+$('pkSalvage').onclick = salvage;
+$('tog').onclick = () => { tmpRule.next = !tmpRule.next; drawRule(); };
+$('ruleCancel').onclick = () => $('ruleDlg').hidden = true;
+$('ruleOk').onclick = () => { S.rule = tmpRule; $('ruleDlg').hidden = true; render(); };
+$('helpOk').onclick = () => $('helpDlg').hidden = true;
+$('result').onclick = () => { $('result').hidden = true; render(); };
+$('devCred').onclick = () => { S.credits += 1000000; render(); };
+$('devPoor').onclick = () => { S.credits = 0; render(); };
+$('devRelic').onclick = () => { for (let i = 0; i < 10; i++) S.relics.push(makeRelic(2 + Math.floor(Math.random() * 4), randPart())); toast('재료 유물 10개 추가'); render(); };
+$('devReset').onclick = () => { initState(); closePicker(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape'){ ['ruleDlg','helpDlg','result'].forEach(id => $(id).hidden = true); if (S.picker) closePicker(); } });
+
+// ---------------- 마우스 오버 정보 ----------------
+const tip = $('tip');
+function relTip(rel){
+  return `<div class="th">${stars(rel.r)} ${PARTS[rel.part].name} <span class="num">+${rel.lv}</span></div>
+    <div class="ts">${rel.eq ? rel.eq + ' 장착 중 · ' : ''}${rel.locked ? '잠금 · ' : ''}재료 경험치 ${comma(fodderExp(rel))}</div>
+    <div class="stat main"><span>${rel.main}</span><span class="v">${fmtMain(rel, mainVal(rel))}</span></div>
+    ${rel.subs.map(s => `<div class="stat"><span>${s.n}</span><span class="v">${fmtSub(s.n, s.v)}${s.c > 1 ? `<span class="cnt">${s.c - 1}</span>` : ''}</span></div>`).join('') || '<div class="ts">보조옵션 없음</div>'}`;
+}
+function itemTip(id, n){
+  const it = ITEMS.find(x => x.id === id);
+  return `<div class="th">${stars(it.r)} ${it.name}</div>
+    <div class="ts">개당 경험치 ${comma(it.exp)} · 보유 ${comma(S.items[id])}</div>
+    <div class="ts">넣은 수량 ×${n} → 경험치 ${comma(it.exp * n)}</div>`;
+}
+let tipKey = null;
+document.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse') return;
+  const el = e.target.closest('[data-uid],[data-tip]');
+  if (!el){ tip.hidden = true; tipKey = null; return; }
+  const key = el.dataset.uid ? 'r:' + el.dataset.uid : el.dataset.tip;
+  if (key !== tipKey){
+    const [k, a, b] = key.split(':');
+    const rel = k === 'r' ? byUid(+a) : null;
+    if (k === 'r' && !rel){ tip.hidden = true; return; }
+    tip.innerHTML = k === 'r' ? relTip(rel) : itemTip(a, +b);
+    tipKey = key;
+  }
+  tip.hidden = false;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = e.clientX + 16, y = e.clientY + 16;
+  if (x + w > innerWidth - 8) x = e.clientX - w - 16;
+  if (y + h > innerHeight - 8) y = Math.max(8, innerHeight - h - 8);
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+});
+document.addEventListener('pointerdown', () => { tip.hidden = true; tipKey = null; });
+document.addEventListener('mouseleave', () => { tip.hidden = true; tipKey = null; });
+
+initState(); render();
+</script>
+
+</body>
+</html>
