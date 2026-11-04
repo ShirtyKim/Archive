@@ -147,7 +147,7 @@
 <header>
   <a class="back" href="../">← 아카이브</a>
   <h1>IRIS <span>×</span> 이터널리턴</h1>
-  <p>신규 캐릭터 '아이리스' 전투 프로토타입 · 훈련장</p>
+  <p>신규 캐릭터 '아이리스' 전투 프로토타입, 훈련장</p>
   <button id="panelBtn">설명 창 숨기기</button>
 </header>
 
@@ -212,7 +212,7 @@
     <div class="card">
       <h2>허수아비</h2>
       <div class="legend">
-        <div><b>A · B</b> 고정형이다. A를 위쪽 벽으로 밀면 D 벽꿍을 볼 수 있다.</div>
+        <div><b>A, B</b> 고정형이다. A를 위쪽 벽으로 밀면 D 벽꿍을 볼 수 있다.</div>
         <div><b>C</b> 좌우로 걷는다.</div>
         <div><b>D</b> 가까이 가면 순간이동으로 도망간다.</div>
       </div>
@@ -248,8 +248,8 @@ const ANIM = { rSpin: 0.45, rPull: 0.55, qJump: 0.45 };
 const WORLD_W = 32, WORLD_H = 18;
 const WALLS = [
   { x: 12.5, y: 4.6, w: 6, h: 0.8, label: '' },
-  { x: 22, y: 1.5, w: 0.8, h: 7.5, label: '얇은 벽 0.8m · E로 넘기 가능' },
-  { x: 21, y: 11, w: 5, h: 5, label: '두꺼운 벽 5m · 넘기 불가' }
+  { x: 22, y: 1.5, w: 0.8, h: 7.5, label: '얇은 벽 0.8m, E로 넘기 가능' },
+  { x: 21, y: 11, w: 5, h: 5, label: '두꺼운 벽 5m, 넘기 불가' }
 ];
 
 /* ---------- 유틸 ---------- */
@@ -1011,7 +1011,7 @@ function buildIris() {
   return g;
 }
 
-// 두 관절 팔: 어깨 S에서 손 H까지, 팔꿈치는 바깥·아래로 굽힌다
+// 두 관절 팔: 어깨 S에서 손 H까지, 팔꿈치는 바깥, 아래로 굽힌다
 const _d = V3(0, 0, 0), _pole = V3(0, 0, 0), _e = V3(0, 0, 0), _h = V3(0, 0, 0);
 const ARM_L = 0.33;
 function solveArm(a, H) {
@@ -1286,7 +1286,7 @@ function animateIris(realDt) {
   u.legs[0].rotation.z = lerp(u.legs[0].rotation.z, sw, 0.35);
   u.legs[1].rotation.z = lerp(u.legs[1].rotation.z, -sw, 0.35);
 
-  // 높이·기울기·눌림: Q는 땅에서 차징 → 놓으면 뛰어올라 → 내리찍기 → 착지 눌림
+  // 높이, 기울기, 눌림: Q는 땅에서 차징 → 놓으면 뛰어올라 → 내리찍기 → 착지 눌림
   let hy = P.dash ? Math.sin(Math.PI * clamp(P.dash.t / CFG.E.time, 0, 1)) * 0.2 : 0, pitch = 0, sq = 1;
   if (P.dash) pitch = -0.3;
   if (P.qHold) pitch = 0.12;
@@ -1425,7 +1425,7 @@ function render3D(realDt) {
     const st = [];
     if (d.air > 0) st.push('에어본'); if (d.stun > 0) st.push('기절'); if (isChained(d)) st.push('사슬');
     if (d.slowVis > 0) st.push('둔화'); if (d.pull) st.push('끌려옴'); if (d.kb) st.push('밀려남');
-    L.st.textContent = st.join(' · ');
+    L.st.textContent = st.join(', ');
   }
   place(irisLbl, P.x, 2.25 + iris.position.y, P.y);
   irisHp.style.width = (P.hp / CFG.iris.hp * 100) + '%';
@@ -1435,11 +1435,11 @@ function render3D(realDt) {
     place(t.el, t.x, t.h + kk * 0.9, t.y);
     t.el.style.opacity = 1 - kk * kk;
   }
-  comboEl.innerHTML = combo.hits > 0 ? `<b>콤보 피해 ${combo.dmg}</b><span>${combo.hits}타 · 3초간 피해가 없으면 초기화</span>` : '';
+  comboEl.innerHTML = combo.hits > 0 ? `<b>콤보 피해 ${combo.dmg}</b><span>${combo.hits}타, 3초간 피해가 없으면 초기화</span>` : '';
   const info = [];
   if (opt.speed !== 1) info.push(`속도 ${opt.speed}x`);
   if (opt.noCd) info.push('쿨타임 없음');
-  infoEl.textContent = info.join(' · ');
+  infoEl.textContent = info.join(', ');
 }
 
 /* ---------- HUD ---------- */
@@ -1476,10 +1476,10 @@ function updateHud() {
     e.bar.style.background = s.k === 'R' ? 'var(--acc2)' : 'var(--acc)';
   }
   const bf = [];
-  if (P.wBuff > 0) bf.push(`<span class="buff w">블래스티드 ${P.wBuff.toFixed(1)}s · 이속 +${CFG.W.ms * 100}% · 공격력 +${CFG.W.ad * 100}%</span>`);
-  if (P.rT > 0) bf.push(`<span class="buff">체인 갱 ${P.rT.toFixed(1)}s · 사슬 ${P.chains.length}개</span>`);
+  if (P.wBuff > 0) bf.push(`<span class="buff w">블래스티드 ${P.wBuff.toFixed(1)}s, 이속 +${CFG.W.ms * 100}%, 공격력 +${CFG.W.ad * 100}%</span>`);
+  if (P.rT > 0) bf.push(`<span class="buff">체인 갱 ${P.rT.toFixed(1)}s, 사슬 ${P.chains.length}개</span>`);
   if (P.cd.T <= 0) bf.push(`<span class="buff w">다음 평타 강화</span>`);
-  bf.push(`<span class="buff n">공격력 ${Math.round(ad())} · 이속 ${moveSpeed().toFixed(2)}m/s</span>`);
+  bf.push(`<span class="buff n">공격력 ${Math.round(ad())}, 이속 ${moveSpeed().toFixed(2)}m/s</span>`);
   document.getElementById('buffs').innerHTML = bf.join('');
   document.getElementById('hpFill').style.width = (P.hp / CFG.iris.hp * 100) + '%';
   document.getElementById('hpTxt').textContent = `${Math.round(P.hp)} / ${CFG.iris.hp}`;
@@ -1491,13 +1491,13 @@ function skillDocs() {
   return {
     T: { tag: '패시브', body: `${c.T.cd}초마다 다음 기본 공격이 강화된다.`, stat: `추가 피해 ${c.T.base}(+공격력 ${pct(c.T.adRatio)})` },
     Q: { tag: `쿨타임 ${c.Q.cd}초`, body: `누른 순간의 커서 방향으로 고정된다. 누르고 있으면 떠오르며 범위가 커지고, 떼면 ${c.Q.offset}m 앞을 내리찍어 에어본시킨다.`,
-         stat: `피해 안쪽 ${dm(c.Q.innerDmg)} + 충격파 ${dm(c.Q.waveDmg)} · 에어본 ${c.Q.airborne}초 · 최대 차지 ${c.Q.holdMax}초` },
-    W: { tag: `쿨타임 ${c.W.cd}초`, body: `Q 쿨타임을 초기화하고, ${c.W.dur}초 동안 이동속도와 공격력이 증가한다.`, stat: `이동속도 +${pct(c.W.ms)} · 공격력 +${pct(c.W.ad)}` },
+         stat: `피해 안쪽 ${dm(c.Q.innerDmg)} + 충격파 ${dm(c.Q.waveDmg)}, 에어본 ${c.Q.airborne}초, 최대 차지 ${c.Q.holdMax}초` },
+    W: { tag: `쿨타임 ${c.W.cd}초`, body: `Q 쿨타임을 초기화하고, ${c.W.dur}초 동안 이동속도와 공격력이 증가한다.`, stat: `이동속도 +${pct(c.W.ms)}, 공격력 +${pct(c.W.ad)}` },
     E: { tag: `쿨타임 ${c.E.cd}초`, body: `커서 방향으로 짧게 돌진한다. Q 시전 중에도 쓸 수 있고, 얇은 벽은 넘는다.`, stat: `거리 ${c.E.dist}m` },
     R: { tag: `쿨타임 ${c.R.cd}초`, body: `주변 적을 사슬로 묶고, ${c.R.dur}초 뒤 아이리스 앞 Q 지점으로 끌어온다. 묶인 적은 이동기를 못 쓰고, ${c.R.breakRange}m 밖으로 멀어지면 사슬이 끊긴다.`,
-         stat: `범위 ${c.R.radius}m · 피해 ${dm(c.R.dmg)} · 멀어질 때 둔화 ${pct(c.R.slow)}` },
-    D: { tag: `쿨타임 ${c.D.cd}초 · 방망이`, body: `커서 방향으로 크게 휘둘러 밀어낸다. 벽에 부딪힌 적은 기절한다.`, stat: `피해 ${dm(c.D.dmg)} · 밀어내기 ${c.D.kb}m · 기절 ${c.D.stun}초` },
-    F: { tag: `쿨타임 ${c.F.cd}초 · 전술 스킬`, body: `커서 방향으로 순간이동한다. 벽 너머로도 갈 수 있고, Q 시전 중에도 쓸 수 있다.`, stat: `거리 최대 ${c.F.dist}m` }
+         stat: `범위 ${c.R.radius}m, 피해 ${dm(c.R.dmg)}, 멀어질 때 둔화 ${pct(c.R.slow)}` },
+    D: { tag: `쿨타임 ${c.D.cd}초 / 방망이`, body: `커서 방향으로 크게 휘둘러 밀어낸다. 벽에 부딪힌 적은 기절한다.`, stat: `피해 ${dm(c.D.dmg)}, 밀어내기 ${c.D.kb}m, 기절 ${c.D.stun}초` },
+    F: { tag: `쿨타임 ${c.F.cd}초 / 전술 스킬`, body: `커서 방향으로 순간이동한다. 벽 너머로도 갈 수 있고, Q 시전 중에도 쓸 수 있다.`, stat: `거리 최대 ${c.F.dist}m` }
   };
 }
 const DOCS = skillDocs();
