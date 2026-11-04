@@ -446,18 +446,7 @@ function pick(uid){
   else S.slots.push({k:'relic', uid});
   render();
 }
-function renderInfo(){
-  const box = $('info'), rel = S.inspect && byUid(S.inspect);
-  if (!rel || !S.picker){ box.hidden = true; return; }
-  box.hidden = false;
-  box.innerHTML = `<h3>${stars(rel.r)} ${PARTS[rel.part].name} <span class="num">+${rel.lv}</span></h3>
-    <div class="sub">${rel.eq ? rel.eq + ' 장착 중 · ' : ''}재료로 쓰면 경험치 ${comma(fodderExp(rel))}</div>
-    <div class="stat main"><span>${rel.main}</span><span class="v">${fmtMain(rel, mainVal(rel))}</span></div>
-    ${rel.subs.map(s => `<div class="stat"><span>${s.n}</span><span class="v">${fmtSub(s.n, s.v)}${s.c > 1 ? `<span class="cnt">${s.c - 1}</span>` : ''}</span></div>`).join('') || '<div class="sub">보조옵션 없음</div>'}
-    <div class="acts"><button id="lockBtn" ${rel.uid === S.target ? 'disabled' : ''}>${rel.locked ? '잠금 해제' : '잠금'}</button><button id="infoX">닫기</button></div>`;
-  $('lockBtn').onclick = () => { rel.locked = !rel.locked; if (rel.locked) S.slots = S.slots.filter(s => !(s.k === 'relic' && s.uid === rel.uid)); render(); };
-  $('infoX').onclick = () => { S.inspect = null; renderPicker(); };
-}
+function renderInfo(){ $('info').hidden = true; }
 function itemsFromExp(exp){
   const got = {}; for (const it of [...ITEMS].reverse()){ const n = Math.floor(exp / it.exp); if (n){ got[it.id] = n; exp -= n * it.exp; } }
   return got;
