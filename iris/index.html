@@ -1681,6 +1681,24 @@ const COMBOS = [
       [5.5, () => demoStep(8, '', `콤보 피해 ${combo.dmg}`)],
       [8.5, () => stopDemo()]
     ]
+  },
+  {
+    id: 'basic', name: '기본 사이클',
+    summary: '궁극기 없이 W로 Q를 한 번 더 맞힌다',
+    steps: ['E 대쉬로 접근', 'Q 차징 (방향 고정)', 'Q 착지, 에어본', '강화 평타 (P)', 'W 앙코르, Q 초기화', 'Q 재적중'],
+    start: { iris: [5, 9], dummies: { A: [10.6, 8.6], B: [10.9, 9.5] } },
+    events: () => [
+      [0.0, () => demoStep(-1, '')],
+      [0.6, () => { demoStep(0, ''); aim(10.7, 9); useE(); demoKey('E'); }],
+      [0.85, () => { demoStep(1, ''); aim(10.7, 9); startQ(); demoKey('Q', '홀드'); }],
+      [1.65, () => { demoStep(2, ''); releaseQ(); demoKey('Q', '떼기'); }],
+      [2.05, () => { demoStep(3, ''); P.atkT = dummies.find(d => d.id === 'A'); demoKey('우클릭', '평타'); }],
+      [2.5, () => { demoStep(4, ''); useW(); demoKey('W'); }],
+      [2.75, () => { demoStep(5, ''); P.atkT = null; aim(10.7, 9); startQ(); demoKey('Q', '홀드'); }],
+      [3.45, () => { releaseQ(); demoKey('Q', '떼기'); }],
+      [4.3, () => demoStep(6, '', `콤보 피해 ${combo.dmg}`)],
+      [7.0, () => stopDemo()]
+    ]
   }
 ];
 let comboSel = 0;
