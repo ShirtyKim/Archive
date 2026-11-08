@@ -231,7 +231,7 @@ const CFG = {
   T: { name: '오프닝 스윙', cd: 6, base: 40, adRatio: 0.6 },
   Q: { name: '배시다운', cd: 8, holdMax: 1.2, autoRelease: 1.5, windup: 0.3, holdSlow: 0.5,
        offset: 2.2,                       // 아이리스 중심 → 내려찍는 지점까지의 거리 (바라보는 방향)
-       inner: [1.5, 2.1], outer: [2.6, 3.6], innerDmg: [80, 1.0], waveDmg: [40, 0.5], airborne: 0.75 },
+       inner: [1.25, 1.75], outer: [2.1, 2.9], innerDmg: [80, 1.0], waveDmg: [40, 0.5], airborne: 0.75 },
   W: { name: '앙코르', cd: 16, dur: 4, ms: 0.25, ad: 0.2 },
   E: { name: '대쉬', cd: 9, dist: 3.5, time: 0.18, wallExtra: 1.0 },
   R: { name: '체인 갱', cd: 60, radius: 6, dur: 2.5, breakRange: 9, slow: 0.4, pullTime: 0.25, pullSpread: 0.7, dmg: [150, 0.8] },
@@ -558,9 +558,10 @@ function slam(f, dir) {
     const dd = dist(c, d);
     if (dd <= outer + d.r) {
       n++;
-      if (dd <= inner + d.r) hit(d, dmgOf(CFG.Q.innerDmg), '#ffb08f');
+      const core = dd <= inner + d.r;   // 안쪽 원: 안쪽 피해 + 에어본. 충격파(바깥 고리): 피해만
+      if (core) hit(d, dmgOf(CFG.Q.innerDmg), '#ffb08f');
       hit(d, dmgOf(CFG.Q.waveDmg), '#ffd6a8');
-      if (!d.pull) { d.air = CFG.Q.airborne; d.airDur = CFG.Q.airborne; d.kb = null; addTxt(d.x, d.y, '에어본', '#ffd84d', 12, 0.7, 3.2); }
+      if (core && !d.pull) { d.air = CFG.Q.airborne; d.airDur = CFG.Q.airborne; d.kb = null; addTxt(d.x, d.y, '에어본', '#ffd84d', 12, 0.7, 3.2); }
     }
   }
   addFx({ type: 'disc', x: c.x, y: c.y, r: inner, color: 0xff7846, op: 0.55, dur: 0.35 });
@@ -865,7 +866,12 @@ function updateDummies(dt) {
       } else { d.x = nx; d.y = ny; d.kb.left -= s; if (d.kb.left <= 1e-3) d.kb = null; }
       continue;
     }
-    if (d.air > 0 || d.stun > 0 || DEMO.active) continue;
+    if (d.air > 0 || d.stun > 0) continue;
+    if (DEMO.active) {   // 예시 콤보: 교전하듯 이동만 한다 (공격은 하지 않는다)
+      if (d.mvT === 'chase') { if (dist(P, d) > 1.4) dummyMove(d, P.x, P.y, DEMO_SPD, dt); }
+      else if (d.mvT && dummyMove(d, d.mvT.x, d.mvT.y, DEMO_SPD, dt)) d.mvT = null;
+      continue;
+    }
 
     if (d.type === 'walker') {
       const tx = d.dir > 0 ? 19 : 11;
@@ -1490,7 +1496,7 @@ function skillDocs() {
   const c = CFG, pct = v => Math.round(v * 100) + '%', dm = ([b, r]) => `${b}(+공격력 ${pct(r)})`;
   return {
     T: { tag: '패시브', body: `${c.T.cd}초마다 다음 기본 공격이 강화된다.`, stat: `추가 피해 ${c.T.base}(+공격력 ${pct(c.T.adRatio)})` },
-    Q: { tag: `쿨타임 ${c.Q.cd}초`, body: `누른 순간의 커서 방향으로 고정된다. 누르고 있으면 떠오르며 범위가 커지고, 떼면 ${c.Q.offset}m 앞을 내리찍어 에어본시킨다.`,
+    Q: { tag: `쿨타임 ${c.Q.cd}초`, body: `누른 순간의 커서 방향으로 고정된다. 누르고 있으면 떠오르며 범위가 커지고, 떼면 ${c.Q.offset}m 앞을 내리찍는다. 안쪽 원의 적은 에어본되고, 바깥 충격파는 피해만 준다.`,
          stat: `피해 안쪽 ${dm(c.Q.innerDmg)} + 충격파 ${dm(c.Q.waveDmg)}, 에어본 ${c.Q.airborne}초, 최대 차지 ${c.Q.holdMax}초` },
     W: { tag: `쿨타임 ${c.W.cd}초`, body: `Q 쿨타임을 초기화하고, ${c.W.dur}초 동안 이동속도와 공격력이 증가한다.`, stat: `이동속도 +${pct(c.W.ms)}, 공격력 +${pct(c.W.ad)}` },
     E: { tag: `쿨타임 ${c.E.cd}초`, body: `커서 방향으로 대쉬한다. Q 시전 중에도 쓸 수 있고, 얇은 벽은 넘는다.`, stat: `거리 ${c.E.dist}m` },
@@ -1644,6 +1650,11 @@ function clearAction() {
   for (const k in P.cd) P.cd[k] = 0;
 }
 const aim = (x, y) => { mouse.x = x; mouse.y = y; };
+// 예시 콤보에서 허수아비를 움직인다: walk = 그 자리로 걸어간다, chase = 아이리스를 쫓아간다(1.4m 앞에서 멈춤)
+const DEMO_SPD = 3.2;
+const dmy = id => dummies.find(d => d.id === id);
+const walk = (id, x, y) => { dmy(id).mvT = { x, y }; };
+const chase = id => { dmy(id).mvT = 'chase'; };
 // 사슬이 끊기지 않는 선에서 시작 지점(x0) 쪽으로 가장 멀리 갈 수 있는 x
 function retreatX(x0, y0, margin) {
   const lim = CFG.R.breakRange - margin;
@@ -1661,16 +1672,18 @@ const COMBOS = [
     id: 'pull-q', name: '끌어오기 Q 연계',
     summary: '띄우고 묶은 뒤 빠졌다가, 반대쪽으로 끌어와 다시 Q를 맞힌다',
     steps: ['Q 풀차징하며 전진', 'Q 놓으며 F + E', '3명 에어본', 'R', '뒤로 빠지기', 'W로 Q 초기화', '반대쪽으로 Q 풀차징', '끌려온 3명에게 Q 적중'],
-    start: { iris: [3.87, 9], dummies: { A: [15.2, 8.2], B: [16.4, 9.2], C: [15.3, 10.1] } },
+    start: { iris: [3.87, 9], dummies: { A: [18.6, 7.6], B: [19.6, 9.6], C: [18.8, 11.0] } },
     events: () => [
-      [0.0, () => demoStep(-1, '')],
+      [0.0, () => { demoStep(-1, ''); walk('A', 17.2, 8.6); walk('B', 18.0, 9.8); walk('C', 17.4, 10.6); }],
+      [0.6, () => { walk('A', 16.0, 7.9); walk('B', 17.0, 9.0); walk('C', 16.0, 10.6); }],
+      [1.2, () => { walk('A', 15.2, 8.2); walk('B', 16.4, 9.2); walk('C', 15.3, 10.1); }],
       [0.6, () => { demoStep(0, ''); aim(15.7, 9); startQ(); demoKey('Q', '홀드'); P.moveT = { x: 6, y: 9 }; }],   // 차징하며 앞으로 걷는다 (이속 50% 감소, 1.2초에 약 2.1m)
       [0.62, () => demoKey('우클릭', '전진')],
       [1.8, () => { demoStep(1, ''); releaseQ(); demoKey('Q', '떼기'); }],
       [1.82, () => { aim(30, 9); useF(); demoKey('F'); }],
       [1.86, () => { useE(); demoKey('E'); }],
       [2.12, () => demoStep(2, '')],
-      [2.2, () => { demoStep(3, ''); useR(); demoKey('R'); }],
+      [2.2, () => { demoStep(3, ''); useR(); demoKey('R'); ['A', 'B', 'C'].forEach(chase); }],
       [2.3, () => {
         demoStep(4, '');
         const x = retreatX(6, 9, 0.5); P.moveT = { x, y: 9 }; aim(x, 9); demoKey('우클릭');
@@ -1686,9 +1699,11 @@ const COMBOS = [
     id: 'basic', name: '기본 사이클',
     summary: '궁극기 없이 W로 Q를 한 번 더 맞힌다',
     steps: ['E 대쉬로 접근', 'Q 차징 (방향 고정)', 'Q 착지, 에어본', '강화 평타 (P)', 'W 앙코르, Q 초기화', 'Q 재적중'],
-    start: { iris: [5, 9], dummies: { A: [10.6, 8.6], B: [10.9, 9.5] } },
+    start: { iris: [5, 9], dummies: { A: [14.2, 7.8], B: [14.6, 10.4] } },
     events: () => [
-      [0.0, () => demoStep(-1, '')],
+      [0.0, () => { demoStep(-1, ''); walk('A', 12.0, 8.3); walk('B', 12.4, 10.0); }],
+      [0.8, () => { walk('A', 10.6, 8.6); walk('B', 10.9, 9.5); }],
+      [2.7, () => { walk('A', 9.8, 8.3); walk('B', 10.0, 9.9); }],
       [0.6, () => { demoStep(0, ''); aim(10.7, 9); useE(); demoKey('E'); }],
       [0.85, () => { demoStep(1, ''); aim(10.7, 9); startQ(); demoKey('Q', '홀드'); }],
       [1.65, () => { demoStep(2, ''); releaseQ(); demoKey('Q', '떼기'); }],
@@ -1726,7 +1741,8 @@ function startDemo() {
     else { d.dead = 1e9; d.hidden = true; }      // 콤보에 안 나오는 허수아비는 숨긴다
   }
   combo.dmg = 0; combo.hits = 0; combo.t = 0;
-  DEMO.ev = C.events();
+  DEMO.ev = C.events().sort((a, b) => a[0] - b[0]);
+  dummies.forEach(d => { d.mvT = null; });
   document.getElementById('demoBtn').textContent = '■ 재생 중지';
   demoSteps.style.display = 'block';
   log(`<b>예시 콤보</b> — ${C.name} 재생`);
@@ -1740,7 +1756,7 @@ function stopDemo(silent) {
   DEMO.active = false; DEMO.ev = [];
   opt.noCd = DEMO.prevNoCd;
   clearAction();
-  dummies.forEach(respawn);
+  dummies.forEach(d => { d.mvT = null; respawn(d); });
   demoCap.style.display = 'none'; demoSteps.style.display = 'none';
   document.getElementById('demoBtn').textContent = '▶ 선택한 콤보 재생';
   if (!silent) log('<b>예시 콤보</b> 종료 — 훈련장으로 돌아왔다');
