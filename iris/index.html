@@ -1008,7 +1008,7 @@ function buildIris() {
   wx(cyl(0.075, 0.05, 0.5, 14), 0.68);              // 배럴
   add(wPiv, new THREE.SphereGeometry(0.075, 14, 10), M.bat, 0.93, 0, 0).scale.set(0.35, 1, 1);
   shadowAll(g);
-  g.userData = { body, legs, arms, finger, wPiv, headMat: M.bat, walk: 0, lx: 5, ly: 9 };
+  g.userData = { body, legs, arms, finger, wPiv, headMat: M.bat, bodyMats: [M.skin, M.hair, M.white, M.pants, M.blue, M.red], walk: 0, lx: 5, ly: 9 };
   return g;
 }
 
@@ -1278,6 +1278,9 @@ function animateIris(realDt) {
   // 방망이 발광: Q 차징 > 강화 평타 > 패시브 준비
   const glow = P.qHold ? lerp(0.1, 0.6, qFrac()) : (P.swingEnh && P.swing > 0 ? 0.6 : P.cd.T <= 0 ? 0.12 : 0);
   u.headMat.emissive.setRGB(glow, glow * 0.45, glow * 0.15);
+  // W 앙코르 지속 중: 몸이 빨갛게 빛난다 (맥동, 끝나기 0.4초 전부터 서서히 꺼진다)
+  const wg = P.wBuff > 0 ? (0.6 + 0.15 * Math.sin(gameTime * 9)) * Math.min(1, P.wBuff / 0.4) : 0;
+  for (const m of u.bodyMats) m.emissive.setRGB(wg, wg * 0.06, wg * 0.04);
 
   // 걷기: 이동량에 맞춰 다리를 흔든다
   const moved = Math.hypot(P.x - u.lx, P.y - u.ly); u.lx = P.x; u.ly = P.y;
